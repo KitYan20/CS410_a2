@@ -5,7 +5,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
-
+#include <fcntl.h>
 #define MAX_SIZE_CMD 256
 #define MAX_SIZE_ARG 16
 
@@ -17,7 +17,6 @@ char i;
 void get_cmd();
 void convert_cmd();
 void shell();
-//void log_handle(int sig);
 
 int main(){
     //signal(SGNCHLD, log_handle);
@@ -26,6 +25,7 @@ int main(){
 }
 
 void shell(){
+
     while(1){
         //get command from a user
         get_cmd();
@@ -39,20 +39,54 @@ void shell(){
         convert_cmd();
         //fork and execute the command
         pid = fork();
-        
-        if (-1 == pid){
+        if (-1 == pid){ //Can't create child process
             printf("failed to create a child\n");
-        }else if (0 == pid){
+        }else if (0 == pid){//Able to create child process
             //printf("hello from child\n");
-
+            char *output_file = NULL;
+            char *input_file = NULL;
+            for (int i = 0; argv[i] != NULL; i++){
+                if (strcmp(argv[i],">") == 0){
+                    output_file = argv[i+1];
+                    argv[i] = NULL; //Remove the ">" redirection
+                    argv[i+1] = NULL; //Remove the file
+                    break;
+                }else if (strcmp(argv[i],"<") == 0){
+                    input_file = argv[i+1];
+                    argv[i] = NULL;
+                    argv[i+1] = NULL;
+                    break;
+                }
+            }
+            if (output_file != NULL){
+                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd_out == -1){
+                    fprintf( stderr, "mysh error: can't open %s\n", output_file);
+                    exit(1);
+                }
+                dup2(fd_out,STDOUT_FILENO);
+                close(fd_out);
+            }
+            if (input_file != NULL){
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in == -1){
+                    fprintf( stderr, "mysh error: can't open %s\n", input_file);
+                    exit(1);
+                }
+                dup2(fd_in,STDIN_FILENO);
+                close(fd_in);
+            }
             execvp(argv[0],argv);
+
+            if( execvp(cmd, argv) == -1 ){
+                //fprintf(stderr, "myshell error: %s\n", strerror(errno) );
+                exit(EXIT_FAILURE);
+            }     
         }else{
             // printf("hello from parent\n");
 			// wait for the command to finish if "&" is not present
-			if(NULL == argv[i]){
-                waitpid(pid, NULL, 0);
-    
-            } 
+            int status;
+            waitpid(pid, NULL, 0);
         }
 
     }
@@ -66,6 +100,7 @@ void get_cmd(){
     }
 }
 
+//Conver the command line from stdin to a array of arguments to parse through
 void convert_cmd(){
     //Split the string into argv
     char *ptr;
@@ -83,4 +118,5 @@ void convert_cmd(){
     }else{
         argv[i] = NULL;
     }
+    
 }
