@@ -38,44 +38,79 @@ int main(){
         background = pipe_count = 0;
         parse_cmd(cmd,args,&background,&pipe_count);
 
-        if (args[0] == NULL){
-            continue;
-        }
-        if (strcmp(args[0],"exit") == 0){
-            break;
-        }
-        pid = fork();
+        char *current_args[MAX_SIZE_ARG];
+        int current_background, current_pipe_count;
+        int arg_index = 0;
 
-        if (pid == 0){
-            //child process
-            execute_command(args,background);
-            exit(0);
-        }else if (pid  < 0){
-            //Error forking
-            fprintf(stderr,"Error forking");
-            exit(EXIT_FAILURE);
-        }else{
-            //parent process
-            if (!background){
-                waitpid(pid,&status,0);
-            }else{
-                printf("%d\n",pid);
+        while (args[arg_index] != NULL) {
+            current_background = background;
+            current_pipe_count = pipe_count;
+            int i = 0;
+            while (args[arg_index] != NULL) {
+                current_args[i++] = args[arg_index++];
+            }
+            current_args[i] = NULL;
+            arg_index++;
+
+            pid = fork();
+
+            if (pid == 0) {
+                // Child process
+                execute_command(current_args, current_background);
+                exit(0);
+            } else if (pid < 0) {
+                // Error forking
+                fprintf(stderr, "Error forking");
+                exit(EXIT_FAILURE);
+            } else {
+                // Parent process
+                if (!current_background) {
+                    waitpid(pid, &status, 0);
+                } else {
+                    printf("%d\n", pid);
+                }
             }
         }
+
+        if (strcmp(args[0], "exit") == 0) {
+            break;
+        }
+        // if (args[0] == NULL){
+        //     continue;
+        // }
+        // if (strcmp(args[0],"exit") == 0){
+        //     break;
+        // }
+        // pid = fork();
+
+        // if (pid == 0){
+        //     //child process
+        //     execute_command(args,background);
+        //     exit(0);
+        // }else if (pid  < 0){
+        //     //Error forking
+        //     fprintf(stderr,"Error forking");
+        //     exit(EXIT_FAILURE);
+        // }else{
+        //     //parent process
+        //     if (!background){
+        //         waitpid(pid,&status,0);
+        //     }else{
+        //         printf("%d\n",pid);
+        //     }
+        // }
     }
     return 0;
 }
 void execute_command(char *args[], int background){
-    int fd, pipe_count = 0,pipe_fd[2];
+    int fd, pipe_count = 0;
+    int pipe_fd[2];
     pid_t pid;
 
     for (int i = 0; args[i] != NULL; i++){
         if (strcmp(args[i], "|") == 0){
-            pipe_count++;
             pipe(pipe_fd);
-
             pid = fork();
-
             if (pid == 0){
                 //child process
                 dup2(pipe_fd[1],STDOUT_FILENO);
@@ -93,45 +128,63 @@ void execute_command(char *args[], int background){
                 close(pipe_fd[0]);
                 close(pipe_fd[1]);
                 args[i] = NULL;
+                pipe_count++;
             }
         }
     }
     //Redirect for input/output
-    for (int i = 0; args[i] != NULL; i++){
-        if (strcmp(args[i] , "<") == 0){
-            fd = open(args[i+1],O_RDONLY);
-            dup2(fd,STDIN_FILENO);
-            close(fd);
-            args[i] = NULL;
-            args[i+1] = NULL;
-        } else if (strcmp(args[i] , ">") == 0){
-            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-            args[i] = args[i + 1] = NULL;
-        } else if (strcmp(args[i] , "1>") == 0){
-            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-            args[i] = args[i + 1] = NULL;
-        } else if (strcmp(args[i] , "2>") == 0){
-            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            dup2(fd, STDERR_FILENO);
-            close(fd);
-            args[i] = args[i + 1] = NULL;
-        } else if (strcmp(args[i] , "&>") == 0){
-            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            dup2(fd, STDOUT_FILENO);
-            dup2(fd, STDERR_FILENO);
-            close(fd);
-            args[i] = args[i + 1] = NULL;
+    if (pipe_count == 0){
+        for (int i = 0; args[i] != NULL; i++){
+            if (strcmp(args[i] , "<") == 0){
+                fd = open(args[i+1],O_RDONLY);
+                dup2(fd,STDIN_FILENO);
+                close(fd);
+                args[i] = NULL;
+                args[i+1] = NULL;
+            } else if (strcmp(args[i] , ">") == 0){
+                fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                args[i] = args[i + 1] = NULL;
+            } else if (strcmp(args[i] , "1>") == 0){
+                fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                args[i] = args[i + 1] = NULL;
+            } else if (strcmp(args[i] , "2>") == 0){
+                fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(fd, STDERR_FILENO);
+                close(fd);
+                args[i] = args[i + 1] = NULL;
+            } else if (strcmp(args[i] , "&>") == 0){
+                fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(fd, STDOUT_FILENO);
+                dup2(fd, STDERR_FILENO);
+                close(fd);
+                args[i] = args[i + 1] = NULL;
+            }
         }
     }
 
     if (!background){
-        if (execvp(args[0],args) < 0){
-            //fprintf(stderr, "myshell error: %s\n", strerror(errno) );
-            exit(EXIT_FAILURE);
+
+        pid_t child_pid = fork();
+        
+        if (child_pid == 0){
+            //child process
+            setpgid(0,0);
+            tcsetpgrp(STDIN_FILENO,getpgrp());// Set the child's process group as the foreground process group
+            if (execvp(args[0],args) < 0){
+                fprintf(stderr, "myshell error");
+                exit(EXIT_FAILURE);
+            }
+        }else if (child_pid < 0){
+            fprintf(stderr,"Error forking");
+            exit(EXIT_FAILURE);          
+        }else {
+            //Parent Process
+            int status;
+            waitpid(child_pid,&status,0);
         }
        
     }else{
@@ -139,7 +192,7 @@ void execute_command(char *args[], int background){
 
         if (pid == 0){
             if (execvp(args[0],args) < 0){
-                //fprintf(stderr, "myshell error: %s\n", strerror(errno) );
+                fprintf(stderr, "myshell error");
                 exit(EXIT_FAILURE);
             }
         } else if (pid < 0){
@@ -150,7 +203,11 @@ void execute_command(char *args[], int background){
 }
 void handle_sigint(int sig){
     // Send SIGINT to all child processes
-    kill(0, SIGINT);
+    pid_t foreground_group_pid = tcgetpgrp(STDIN_FILENO);
+    if (foreground_group_pid != -1){
+        killpg(foreground_group_pid,SIGINT);
+    }
+
 }
 
 void handle_sigchild(int sig){
@@ -158,7 +215,10 @@ void handle_sigchild(int sig){
     int status;
     //will check if any zombie-children exist. If yes, one of them is reaped and its exit status returned. 
     //If not, either 0 is returned (if unterminated children exist) or -1 is returned (if not) 
-    while(waitpid(-1,&status,WNOHANG) > 0);
+    pid_t child_pid;
+    while ((child_pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("Child process with PID %d exited\n", child_pid);
+    }
 
 }
 
