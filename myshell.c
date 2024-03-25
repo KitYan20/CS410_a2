@@ -9,114 +9,196 @@
 #define MAX_SIZE_CMD 256
 #define MAX_SIZE_ARG 16
 
-char cmd[MAX_SIZE_CMD];
-char *argv[MAX_SIZE_ARG];
-pid_t pid;
-char i;
-
-void get_cmd();
-void convert_cmd();
-void shell();
+void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count);
+void handle_sigint(int sig);
+void handle_sigchild(int sig);
+void execute_command(char *args[], int background);
 
 int main(){
     //signal(SGNCHLD, log_handle);
-    shell();
-    return 0;
-}
+    char cmd[MAX_SIZE_CMD];
+    char *args[MAX_SIZE_ARG];
+    pid_t pid, child_pid;
 
-void shell(){
+    int background,pipe_count,status;
+
+    signal(SIGINT,handle_sigint);
+    signal(SIGCHLD,handle_sigchild);
 
     while(1){
-        //get command from a user
-        get_cmd();
-
-        if (!strcmp("",cmd)){
-            continue;
+        if (isatty(STDIN_FILENO)){
+            printf("myshell> ");
         }
-        if (!strcmp("exit",cmd)){
+
+        if (fgets(cmd,MAX_SIZE_CMD,stdin) == NULL){
             break;
         }
-        convert_cmd();
-        //fork and execute the command
-        pid = fork();
-        if (-1 == pid){ //Can't create child process
-            printf("failed to create a child\n");
-        }else if (0 == pid){//Able to create child process
-            //printf("hello from child\n");
-            char *output_file = NULL;
-            char *input_file = NULL;
-            for (int i = 0; argv[i] != NULL; i++){
-                if (strcmp(argv[i],">") == 0){
-                    output_file = argv[i+1];
-                    argv[i] = NULL; //Remove the ">" redirection
-                    argv[i+1] = NULL; //Remove the file
-                    break;
-                }else if (strcmp(argv[i],"<") == 0){
-                    input_file = argv[i+1];
-                    argv[i] = NULL;
-                    argv[i+1] = NULL;
-                    break;
-                }
-            }
-            if (output_file != NULL){
-                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                if (fd_out == -1){
-                    fprintf( stderr, "mysh error: can't open %s\n", output_file);
-                    exit(1);
-                }
-                dup2(fd_out,STDOUT_FILENO);
-                close(fd_out);
-            }
-            if (input_file != NULL){
-                int fd_in = open(input_file, O_RDONLY);
-                if (fd_in == -1){
-                    fprintf( stderr, "mysh error: can't open %s\n", input_file);
-                    exit(1);
-                }
-                dup2(fd_in,STDIN_FILENO);
-                close(fd_in);
-            }
-            execvp(argv[0],argv);
 
-            if( execvp(cmd, argv) == -1 ){
+        cmd[strlen(cmd) - 1] = '\0';
+        background = pipe_count = 0;
+        parse_cmd(cmd,args,&background,&pipe_count);
+
+        if (args[0] == NULL){
+            continue;
+        }
+        if (strcmp(args[0],"exit") == 0){
+            break;
+        }
+        pid = fork();
+
+        if (pid == 0){
+            //child process
+            execute_command(args,background);
+            exit(0);
+        }else if (pid  < 0){
+            //Error forking
+            fprintf(stderr,"Error forking");
+            exit(EXIT_FAILURE);
+        }else{
+            //parent process
+            if (!background){
+                waitpid(pid,&status,0);
+            }else{
+                printf("%d\n",pid);
+            }
+        }
+    }
+    return 0;
+}
+void execute_command(char *args[], int background){
+    int fd, pipe_count = 0,pipe_fd[2];
+    pid_t pid;
+
+    for (int i = 0; args[i] != NULL; i++){
+        if (strcmp(args[i], "|") == 0){
+            pipe_count++;
+            pipe(pipe_fd);
+
+            pid = fork();
+
+            if (pid == 0){
+                //child process
+                dup2(pipe_fd[1],STDOUT_FILENO);
+                close(pipe_fd[0]);
+                close(pipe_fd[1]);
+                execute_command(args,background);
+                exit(0);
+            }else if (pid  < 0){
+                //Error forking
+                fprintf(stderr,"Error forking");
+                exit(EXIT_FAILURE);
+            }else{
+                //parent process
+                dup2(pipe_fd[0],STDIN_FILENO);
+                close(pipe_fd[0]);
+                close(pipe_fd[1]);
+                args[i] = NULL;
+            }
+        }
+    }
+    //Redirect for input/output
+    for (int i = 0; args[i] != NULL; i++){
+        if (strcmp(args[i] , "<") == 0){
+            fd = open(args[i+1],O_RDONLY);
+            dup2(fd,STDIN_FILENO);
+            close(fd);
+            args[i] = NULL;
+            args[i+1] = NULL;
+        } else if (strcmp(args[i] , ">") == 0){
+            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+            args[i] = args[i + 1] = NULL;
+        } else if (strcmp(args[i] , "1>") == 0){
+            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+            args[i] = args[i + 1] = NULL;
+        } else if (strcmp(args[i] , "2>") == 0){
+            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+            args[i] = args[i + 1] = NULL;
+        } else if (strcmp(args[i] , "&>") == 0){
+            fd = open(args[i+1],O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+            args[i] = args[i + 1] = NULL;
+        }
+    }
+
+    if (!background){
+        if (execvp(args[0],args) < 0){
+            //fprintf(stderr, "myshell error: %s\n", strerror(errno) );
+            exit(EXIT_FAILURE);
+        }
+       
+    }else{
+        pid = fork();
+
+        if (pid == 0){
+            if (execvp(args[0],args) < 0){
                 //fprintf(stderr, "myshell error: %s\n", strerror(errno) );
                 exit(EXIT_FAILURE);
-            }     
-        }else{
-            // printf("hello from parent\n");
-			// wait for the command to finish if "&" is not present
-            int status;
-            waitpid(pid, NULL, 0);
+            }
+        } else if (pid < 0){
+            fprintf(stderr,"Error forking");
+            exit(EXIT_FAILURE);
         }
-
     }
 }
+void handle_sigint(int sig){
+    // Send SIGINT to all child processes
+    kill(0, SIGINT);
+}
 
-void get_cmd(){
-    printf("myshell> ");
-    fgets(cmd,MAX_SIZE_CMD,stdin); //Get a command from a user
-    if ((strlen(cmd) > 0) && (cmd[strlen(cmd) -  1] == '\n')){
-        cmd[strlen(cmd) - 1] = '\0';
-    }
+void handle_sigchild(int sig){
+    //Wait for all child processes to terminate
+    int status;
+    //will check if any zombie-children exist. If yes, one of them is reaped and its exit status returned. 
+    //If not, either 0 is returned (if unterminated children exist) or -1 is returned (if not) 
+    while(waitpid(-1,&status,WNOHANG) > 0);
+
 }
 
 //Conver the command line from stdin to a array of arguments to parse through
-void convert_cmd(){
-    //Split the string into argv
-    char *ptr;
-    i = 0;
-    ptr = strtok(cmd," ");
-    while(ptr != NULL){
-        argv[i] = ptr;
-        i++;
-        ptr = strtok(NULL," ");
-    }
-    //Checks for & 
-    if (!strcmp("&", argv[i-1])){
-        argv[i-1] = NULL;
-        argv[i] = "&";
-    }else{
-        argv[i] = NULL;
+void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count){
+    int arg_count = 0;
+    char *token, *rest = cmd;
+    char *saveptr; //for strtok_r
+    token = strtok_r(rest, ";", &saveptr);
+    
+    while(token != NULL){
+        char *cmd_args[MAX_SIZE_ARG];
+        int cmd_background = 0;
+        int cmd_pipe_count = 0;
+        int cmd_arg_count = 0;
+
+        char *cmd_token, *cmd_rest = token;
+
+        while((cmd_token = strtok_r(cmd_rest," ",&cmd_rest))){
+            //Background task running
+            if (strcmp(cmd_token, "&") == 0){
+                cmd_background = 1;
+            } else if (strcmp(cmd_token,"|") == 0){
+                cmd_pipe_count++;
+                cmd_args[cmd_arg_count++] = cmd_token;
+            }else{
+                cmd_args[cmd_arg_count++] = cmd_token;
+            }
+        }
+        cmd_args[cmd_arg_count] = NULL;
+
+        for (int i = 0; i < cmd_arg_count; i++) {
+            args[arg_count++] = cmd_args[i];
+        }
+        args[arg_count++] = NULL;
+
+        *background = cmd_background;
+        *pipe_count += cmd_pipe_count;
+
+        token = strtok_r(NULL, ";", &saveptr);
     }
     
 }
