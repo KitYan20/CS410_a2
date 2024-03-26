@@ -21,15 +21,16 @@ int main(){
     //Get the number of arguments from the terminal via array of strings
     char *args[MAX_SIZE_ARG];
     //Initialize process id to be used for later
-    pid_t pid, child_pid;
+    pid_t pid;
     //Initialize a background to check whether to have a command execute on the background
     //A pipe count to check how many pipeline processes if there are in the terminal
     //A status to check the status of the pid
     int background,pipe_count,status;
+
     struct sigaction sa;
     sa.sa_handler = handle_sigint;
     sigaction(SIGINT,&sa, NULL);
-
+    
     //signal(SIGINT,handle_sigint);
     signal(SIGCHLD,handle_sigchild);
 
@@ -198,9 +199,16 @@ void handle_sigint(int sig){
 void handle_sigchild(int sig){
     //Wait for all child processes to terminate
     int status;
+    pid_t child_pid;
     //will check if any zombie-children exist. If yes, one of them is reaped and its exit status returned. 
     //If not, either 0 is returned (if unterminated children exist) or -1 is returned (if not) 
-    while(waitpid(-1,&status,WNOHANG) > 0);
+    printf("sigchld_handler called\n"); // Print statement to identify the function
+    //-1 is to wait for any child processes
+    //&status is a pointer to an integer where the exit status of the child process will be stored
+    //WNOHANG flag tells waitpid to return immediately if no child process has exited; otherwise, it will block until a child process exits.
+    while(waitpid(-1,&status,WNOHANG) > 0){
+        printf("Child process with PID %d terminated\n", child_pid);
+    }
 
 }
 
