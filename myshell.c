@@ -26,8 +26,11 @@ int main(){
     //A pipe count to check how many pipeline processes if there are in the terminal
     //A status to check the status of the pid
     int background,pipe_count,status;
+    struct sigaction sa;
+    sa.sa_handler = handle_sigint;
+    sigaction(SIGINT,&sa, NULL);
 
-    signal(SIGINT,handle_sigint);
+    //signal(SIGINT,handle_sigint);
     signal(SIGCHLD,handle_sigchild);
 
     //Initialize our shell in a while loop to continously take commands from user until exit
@@ -133,7 +136,7 @@ void execute_command(char *args[], int background){
                 fd = open(args[i+1],O_RDONLY);
                 dup2(fd,STDIN_FILENO);//fd is duplicated into the standard input (STDIN_FILENO)
                 close(fd);//Close the fd after it's been read
-                args[i] = args[i+1] = = NULL; //Mark the positon of the argument array to NULL to indicate the cmd has been completed
+                args[i] = args[i+1] = NULL; //Mark the positon of the argument array to NULL to indicate the cmd has been completed
                 //Along with the argument where the location of using the command
             } else if (strcmp(args[i] , ">") == 0){//redirect to stdout
                 //Same process for the rest of the redirection but now we are writing to the file indicated by args[i+1]
@@ -184,10 +187,11 @@ void execute_command(char *args[], int background){
 void handle_sigint(int sig){
     // Send SIGINT to all child processes
     
-    pid_t foreground_group_pid = tcgetpgrp(STDIN_FILENO);
-    if (foreground_group_pid != -1){
-        killpg(foreground_group_pid,SIGINT);
-    }
+    // pid_t foreground_group_pid = tcgetpgrp(STDIN_FILENO);
+    // if (foreground_group_pid != -1){
+    //     killpg(foreground_group_pid,SIGINT);
+    // }
+    fprintf(stdout,"\nsignal interrupt\n");
 
 }
 
