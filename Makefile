@@ -10,5 +10,7 @@ OBJS = myshell.o
 all: myshell
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
+observe: observe.o
+	$(CC) ${OPT} ${DEBUG} $^ -o $@	
 clean:
-	rm *.o myshell
+	rm *.o myshell observe
