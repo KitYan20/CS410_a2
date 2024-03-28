@@ -14,7 +14,7 @@ void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count);
 void handle_sigint(int sig);
 void handle_sigchild(int sig);
 void execute_command(char *args[], int background);
-
+pid_t foreground_group_pid = 0; //Global variable to keep track of foreground processes
 int main(){
     //Initialize a cmd char array for the command line from STDIN
     char cmd[MAX_SIZE_CMD];
@@ -27,11 +27,9 @@ int main(){
     //A status to check the status of the pid
     int background,pipe_count,status;
 
-    struct sigaction sa;
-    sa.sa_handler = handle_sigint;
-    sigaction(SIGINT,&sa, NULL);
+
     
-    //signal(SIGINT,handle_sigint);
+    signal(SIGINT,handle_sigint);
     signal(SIGCHLD,handle_sigchild);
 
     //Initialize our shell in a while loop to continously take commands from user until exit
@@ -64,6 +62,10 @@ int main(){
             }
             current_args[i] = NULL;
             arg_index++;
+            if (!background){
+                foreground_group_pid = getpid();
+            }
+
             pid = fork();//Create a child process
             if (pid == 0) {
                 // Child process and execute the current command arguments with the current background status
@@ -78,6 +80,7 @@ int main(){
                 if (!current_background) {
                     //Parent can collect the exit status of the child to prevent creation of a Zombie  process
                     waitpid(pid, &status, 0);// allows the parent process to wait for a specific child process to terminate. 
+                    foreground_group_pid = 0;
                 } else {
                     printf("I am parent %d status %d\n", pid,status);
                 }
@@ -186,13 +189,13 @@ void execute_command(char *args[], int background){
     }
 }
 void handle_sigint(int sig){
-    // Send SIGINT to all child processes
-    
-    // pid_t foreground_group_pid = tcgetpgrp(STDIN_FILENO);
-    // if (foreground_group_pid != -1){
-    //     killpg(foreground_group_pid,SIGINT);
-    // }
-    fprintf(stdout,"\nsignal interrupt\n");
+    if (foreground_group_pid != 0){
+        killpg(foreground_group_pid,SIGINT);
+    }else{
+        //Flush the buffer back to standard out
+        printf("\nmyshell> ");
+        fflush(stdout);
+    }
 
 }
 
