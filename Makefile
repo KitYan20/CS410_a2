@@ -10,9 +10,11 @@ OBJS = myshell.o
 all: myshell
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
+tapper: tapper.o
+	$(CC) ${OPT} ${DEBUG} $^ -o $@
 observe: observe.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@	
-tapper: tapper.o
+reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 clean:
 	rm *.o myshell observe tapper
