@@ -12,5 +12,7 @@ myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 observe: observe.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@	
+tapper: tapper.o
+	$(CC) ${OPT} ${DEBUG} $^ -o $@
 clean:
-	rm *.o myshell observe
+	rm *.o myshell observe tapper

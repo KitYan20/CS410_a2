@@ -1,51 +1,59 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#define MAX_LINE_LEN 256
-#define MAX_NAMES 256
-#define MAX_VALUES 256
+#define MAX_NAME_LEN 100
+#define MAX_VALUE_LEN 1064
+#define MAX_NAMES 100
 
-void observe(FILE *input, void *buffer, int is_ring_buffer, int buffer_size){
-    char line[MAX_LINE_LEN];
-    char *names[MAX_NAMES];
-    char *values[MAX_VALUES];
-    int num_names = 0;
-    int num_values = 0;
-    char *end_name = NULL;
+typedef struct {
+    char name_value[MAX_VALUE_LEN];
+} NameValue;
 
-    while (fgets(line, MAX_LINE_LEN, stdin)) {
-        char *name = strtok(line, "=");
-        char *value = strtok(NULL, "\n");
+int main() {
+    char input[256];
+    NameValue unique_names[MAX_NAMES];
+    int num_unique_names = 0;
+    int end_name_index = -1;
+    char result[256];
+    while (fgets(input, sizeof(input), stdin) != NULL) {
+        char* equals_sign = strchr(input, '=');
+        if (equals_sign != NULL) {
+            *equals_sign = '\0';  // Null-terminate the name
+            char* name = input;
+            char* value = equals_sign + 1;
+                        // Remove newline from value
+            char* newline = strchr(value, '\n');
+            if (newline != NULL) {
+                *newline = '\0';
 
-        int is_new_name = 1;
-        for (int i = 0; i < num_names; i++) {
-            if (strcmp(name, names[i]) == 0 && strcmp(value,values[i]) == 0) {
-                is_new_name = 0;
-                if (end_name == NULL) {
-                    end_name = names[i];
-                }
-                break;
             }
+            strcpy(result,name);
+            strcat(result,"=");
+            strcat(result,value);
+            int existing_name_index = -1;
+            for (int i = 0 ; i < num_unique_names; i++){
+                if (strcmp(unique_names[i].name_value,result) == 0){
+                    existing_name_index = i;
+                    break;
+                }
+            }
+            //If name does not exist
+            if (existing_name_index == -1){
+                strcpy(unique_names[num_unique_names].name_value,result);
+                num_unique_names++;
+                end_name_index = num_unique_names - 1;
+            }else if (existing_name_index != -1 && existing_name_index == end_name_index){
+                
+            }
+            memset(result,'\0',sizeof(result));
         }
-        if (is_new_name) {
-            names[num_names++] = strdup(name);
-            values[num_values++] = strdup(value);
-            int len = strlen(line);
-            write_to_buffer(buffer, line, len, is_ring_buffer, buffer_size);
-            //printf("%s=%s\n", name, value);
-            fflush(stdout);
-        } else if (strcmp(name, end_name) == 0) {
-            int len = strlen(line);
-            write_to_buffer(buffer, line, len, is_ring_buffer, buffer_size);
-            //printf("%s=%s\n", name, value);
-            fflush(stdout);
-        }
+    }
+    for (int i = 0; i < num_unique_names; i++){
+        printf("%s ", unique_names[i].name_value);
 
-        // for (int i; i<num_names; i++){
-        //     printf("%s=%s, " , names[i],values[i]);
-        // }       
     }
 
-
+    return 0;
 }

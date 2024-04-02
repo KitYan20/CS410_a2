@@ -1,0 +1,15 @@
+temperature=60 F
+time=10 s
+temperature=60 F
+time=20 s
+temperature=61 F
+time=30 s
+temperature=62 F
+time=40 s
+temperature=64 F
+time=50 s
+temperature=65 F
+time=55 s
+
+
+
