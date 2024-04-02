@@ -17,4 +17,4 @@ observe: observe.o
 reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 clean:
-	rm *.o myshell observe tapper
+	rm *.o myshell observe tapper reconstruct
