@@ -40,7 +40,7 @@ int main(){
             printf("myshell> ");
             fflush(stdout);
         }
-
+        //This is to handle ctrl-d which will terminate the shell session
         if (fgets(cmd,MAX_SIZE_CMD,stdin) == NULL){
             if (feof(stdin)){
                 exit(EXIT_SUCCESS);
@@ -60,11 +60,7 @@ int main(){
             //break;
         }
 
-        if (pipe_count > 0){//Check for pipe count to execute pipeline commands
-            execute_pipeline(args,pipe_count,background);
-        }else{//execute single normal and redirection commands 
-            execute_command(args,background);
-        }
+  
         
     }
     return 0;
@@ -75,7 +71,7 @@ void execute_pipeline(char *args[], int pipe_count, int background) {
     int arg_index = 0;
     char *current_args[MAX_SIZE_ARG];
 
-    pipeline_pid = fork();
+    pipeline_pid = fork();//Create a child process for the pipeline
     if (pipeline_pid == 0) {
         // Child process for the entire pipeline
         while (args[arg_index] != NULL) {
@@ -224,42 +220,57 @@ void handle_sigchild(int sig){
 }
 
 //Convert the command line from stdin to a array of arguments to parse through
-void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count){
+void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count) {
     int arg_count = 0;
     char *token, *rest = cmd;
-    char *saveptr; //for strtok_r
+    char *saveptr; // for strtok_r
+
+    // Split the command by ";" to handle a sequence of commands if there is 
+    //The strtok_r function searches for the first character in str that is not contained in delim. 
+    //If no such character is found, strtok_r returns NULL. 
+    //If a non-delimiter character is found, strtok_r returns a pointer to the beginning of the token and writes a null character into str immediately following the returned token.
     token = strtok_r(rest, ";", &saveptr);
-    
-    while(token != NULL){
-        char *cmd_args[MAX_SIZE_ARG];
-        int cmd_background = 0;
+    while (token != NULL) {
+        char *cmd_args[MAX_SIZE_ARG];//Store our array of command arguments
+        int cmd_background = 0;//initialize variables to check for background status, number of arguments, and number of pipes
         int cmd_pipe_count = 0;
         int cmd_arg_count = 0;
 
         char *cmd_token, *cmd_rest = token;
-
-        while((cmd_token = strtok_r(cmd_rest," ",&cmd_rest))){
-            //Background task running
-            if (strcmp(cmd_token, "&") == 0){
+        // Parse individual command arguments
+        while ((cmd_token = strtok_r(cmd_rest, " ", &cmd_rest))) {
+            if (strcmp(cmd_token, "&") == 0) { //This will check if the token in the argument is & to indicate background process
                 cmd_background = 1;
-            } else if (strcmp(cmd_token,"|") == 0){
-                cmd_pipe_count++;
-                cmd_args[cmd_arg_count++] = cmd_token;
-            }else{
-                cmd_args[cmd_arg_count++] = cmd_token;
+            } else if (strcmp(cmd_token, "|") == 0) { //Checks for the command line for "|" to indicate pipeline process
+                cmd_pipe_count++;//Count the number of pipes in the command line
+                cmd_args[cmd_arg_count++] = cmd_token;//Store the "|" token into our array of command arguments
+            } else {
+                cmd_args[cmd_arg_count++] = cmd_token;//Store the rest of tokens from the command line in myshell
             }
         }
-        cmd_args[cmd_arg_count] = NULL;
+        cmd_args[cmd_arg_count] = NULL;//End the last element of the array with NULL
 
+        // Copy the command arguments to the main args array
         for (int i = 0; i < cmd_arg_count; i++) {
             args[arg_count++] = cmd_args[i];
         }
-        args[arg_count++] = NULL;
+        args[arg_count++] = NULL;//End the last element of the array with NULL
 
-        *background = cmd_background;
-        *pipe_count += cmd_pipe_count;
+        *background = cmd_background;//Store the background status and pipe count to be used for executing commands
+        *pipe_count = cmd_pipe_count;
+
+        
+        if (*pipe_count > 0) {// Need execute pipeline process if there are "|" in the command line
+            execute_pipeline(args, *pipe_count, *background);
+        } else {// Execute the command with the array of arguments and background status
+            execute_command(args, *background);
+        }
+
+        // Reset the args array and counters for the next sequence og command
+        arg_count = 0;
+        *background = 0;
+        *pipe_count = 0;
 
         token = strtok_r(NULL, ";", &saveptr);
     }
-    
 }
