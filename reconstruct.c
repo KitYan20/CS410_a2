@@ -31,16 +31,27 @@ int main(){
         }
     }
     int is_new_name = 0;
-    
-    while(i < num_inputs){
-        is_new_name = 1;
-        char *name = strtok(meme[i],"=");
-        char *value = strtok(NULL, "="); // Get the value after "="
-        char *current_name = name;
-        printf("%s = %s\n",name,value);
-        i++;
+    char *name = strtok(meme[i],"=");
+    char *value = strtok(NULL, "="); // Get the value after "="
+    strcpy(result,name);
+    strcat(result,"=");
+    strcat(result,value);
+    printf("%s\n",result);
+    memset(result,'\0',sizeof(result));
+    i++;
+    // while(i < num_inputs){
+    //     char *current_name = strtok(meme[i],"=");
+    //     char *current_value = strtok(NULL, "="); // Get the value after "="
+    //     while(strcmp(name,current_name) != 0){
+    //         char *current_name_1 = strtok(meme[i],"=");
+    //         char *current_value_1 = strtok(NULL, "="); // Get the value after "="
+    //         current_name = current_name_1;
+            
+            
+    //     }
+    //     i++;
         
       
-    }
+    // }
     return 0;
 }
