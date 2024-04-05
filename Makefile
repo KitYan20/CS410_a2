@@ -11,9 +11,9 @@ all: myshell
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tapper: tapper.o
-	$(CC) ${OPT} ${DEBUG} $^ -o $@
+	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@
 observe: observe.o
-	$(CC) ${OPT} ${DEBUG} $^ -o $@	
+	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@	
 reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 clean:

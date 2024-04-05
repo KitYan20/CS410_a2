@@ -2,10 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define MAX_NAME_LEN 100
 #define MAX_VALUE_LEN 1064
 #define MAX_NAMES 100
+#define SHARED_MEM_SIZE 1064
 
 //Initialize a struct data type to store our name_value object
 typedef struct {
@@ -17,6 +22,20 @@ int main() {
     NameValue unique_names[MAX_NAMES];//create our NameValue struct data type object with size up to 100 names
     int num_unique_names = 0;//This will be our counter to count how many name_value pairs are stored 
     char result[256];//A result string to combine both the name and value of a input line
+
+    //shm_open creates and opens a new, or opens an existing, POSIX shared memory object.
+    int shm_fd = shm_open("/observe_shm", O_CREAT | O_RDWR ,0666);
+
+    if (shm_fd == -1){
+        printf("Error opening a shared memory object");
+        exit(EXIT_FAILURE);
+    }
+    ftruncate(shm_fd, SHARED_MEM_SIZE);//Truncate the shm_fd to be truncated to a size of precisely length bytes.
+    char *shared_mem = mmap(NULL,SHARED_MEM_SIZE,PROT_READ | PROT_WRITE, MAP_SHARED,shm_fd,0);
+    if (shared_mem == MAP_FAILED){
+        printf("Error creating a new mapping in the virtual address space");
+        exit(EXIT_FAILURE);
+    }
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
         if (equals_sign != NULL) {
@@ -46,10 +65,20 @@ int main() {
             memset(result,'\0',sizeof(result));
         }
     }
+    // for (int i = 0; i < num_unique_names; i++){
+    //     printf("%s ", unique_names[i].name_value);
+
+    // }
+    char *shared_mem_ptr = shared_mem;
     for (int i = 0; i < num_unique_names; i++){
-        printf("%s ", unique_names[i].name_value);
+        strcpy(shared_mem_ptr,unique_names[i].name_value);
+        shared_mem_ptr += strlen(unique_names[i].name_value) + 1;
+        //printf("%s ", unique_names[i].name_value);
 
     }
 
+    //unmapped and close the shared memory region
+    munmap(shared_mem,SHARED_MEM_SIZE);
+    close(shm_fd);
     return 0;
 }
