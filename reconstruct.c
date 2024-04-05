@@ -6,10 +6,13 @@
 #define MAX_NAMES 256
 #define MAX_LINES 256
 
+
+// Initialize a struct to store our samples
 typedef struct {
     int sample_number;
     char value[MAX_NAMES];
 } Sample;
+
 //The text input have white space when I split each token with the "," delimeter
 char *trim_leading_space(char *str){
     while(isspace(*str)){
@@ -47,11 +50,13 @@ int main() {
         char* name = strtok(trim_leading_space(meme[i]), "=");
         
         int is_new_name = 1;
+
         for (j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
                 break;
             }
+
         }
         if (is_new_name) {
             strcpy(unique_names[num_unique_names], name);
@@ -67,6 +72,7 @@ int main() {
     for (int i = 0; i < num_unique_names ; i++){
         printf("%s\n",unique_names[i]);
     }
+
     printf("Number of unique names: %d\n", num_unique_names);
     printf("End name: %s\n", end_name);
 
@@ -112,6 +118,7 @@ int main() {
     for (i = 0; i < current_sample; i++) {
         printf("sample number %d ,%s\n", samples[i].sample_number, samples[i].value);
     }
+
 
 
     return 0;
