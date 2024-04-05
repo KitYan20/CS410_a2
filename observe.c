@@ -73,7 +73,7 @@ int main() {
     for (int i = 0; i < num_unique_names; i++){
         strcpy(shared_mem_ptr,unique_names[i].name_value);
         shared_mem_ptr += strlen(unique_names[i].name_value) + 1;
-        //printf("%s ", unique_names[i].name_value);
+        printf("%s ", unique_names[i].name_value);
 
     }
 
