@@ -83,8 +83,8 @@ int main() {
     char* prev = "";
     // loop through all input data tokens to fill samples[] 
     for (i = 0; i < num_inputs; i++) {
-        char *name = strtok(trim_leading_space(input_samples[i]), "=");
-        char *value = strtok(NULL, "=");
+        char* name = strtok(trim_leading_space(input_samples[i]), "=");
+        char* value = strtok(NULL, "=");
         
         // now we have name and value
         //printf("Name=%s | value=%s\n", name, value);
@@ -93,10 +93,14 @@ int main() {
         if (strcmp(name, end_name) == 0) {
             // if dupe is 1 then that means that we borrow from previous sample
             if (dupe == 1){
+                printf("FINALLY DUPE = 1\n");
                 strcat(samples[current_sample].value, prev);
                 strcat(samples[current_sample].value, name);
                 strcat(samples[current_sample].value, "=");
                 strcat(samples[current_sample].value, value);
+                dupe = 0;
+                samples[current_sample].sample_number = current_sample + 1;      
+                current_sample++;
             }
             else{
             printf("End of current sample, which is %d\n", current_sample);
@@ -110,6 +114,7 @@ int main() {
             printf("Sample %d: -%s-\n", current_sample, samples[current_sample].value);      
             current_sample++;
             dupe = 1;
+            printf("dupe=%d\n", dupe);
             }
             
         }
@@ -126,15 +131,15 @@ int main() {
 
         int name_found = 0;
 
-        // prev_val[j] = name = value of the last named object
-        // for (j = 0; j < num_unique_names; j++) {
-        //     if (strcmp(name, unique_names[j]) == 0) {
-        //         name_found = 1;
-        //         strcpy(prev_values[j],value);
-        //         printf("Prev_val[j]=%s \n", prev_values[j]);
-        //         break;
-        //     }
-        // }
+        //prev_val[j] = name = value of the last named object
+        for (j = 0; j < num_unique_names; j++) {
+            if (strcmp(name, unique_names[j]) == 0) {
+                name_found = 1;
+                strcpy(prev_values[j],value);
+                //printf("Prev_val[j]=%s \n", prev_values[j]);
+                break;
+            }
+        }
 
 
         // for (j = 0; j < num_unique_names; j++) {
@@ -146,7 +151,6 @@ int main() {
         //         strcat(samples[current_sample].value, "=");
         //         strcat(samples[current_sample].value, prev_values[j]);
         //     }
-            
         // }
 
 
