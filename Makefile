@@ -7,13 +7,13 @@ OBJS = myshell.o
 	$(CC) -c ${OPT} ${DEBUG} $< -o $@
 .PHONY: all clean
 .SILENT: clean
-all: myshell
+all: myshell tapper observe reconstruct
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tapper: tapper.o
-	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@
+	$(CC) ${OPT} ${DEBUG} $^ -o $@
 observe: observe.o
-	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@	
+	$(CC) ${OPT} ${DEBUG} $^ -o $@	
 reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 clean:
