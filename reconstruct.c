@@ -80,6 +80,7 @@ int main() {
 
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
     int dupe = 0;
+    int numAdded = 0;
     char* prev = "";
     // loop through all input data tokens to fill samples[] 
     for (i = 0; i < num_inputs; i++) {
@@ -91,52 +92,37 @@ int main() {
 
         // if this sample's name is the end name, wrap up this sample 
         if (strcmp(name, end_name) == 0) {
-            // if dupe is 1 then that means that we borrow from previous sample
-            if (dupe == 1){
-                printf("FINALLY DUPE = 1\n");
-                strcat(samples[current_sample].value, prev);
-                strcat(samples[current_sample].value, name);
+            for (j = 0; j < num_unique_names - 1; j++) {
+                strcat(samples[current_sample].value, unique_names[j]);
                 strcat(samples[current_sample].value, "=");
-                strcat(samples[current_sample].value, value);
-                dupe = 0;
-                samples[current_sample].sample_number = current_sample + 1;      
-                current_sample++;
+                strcat(samples[current_sample].value, prev_values[j]);
+                strcat(samples[current_sample].value, ", ");
             }
-            else{
-            printf("End of current sample, which is %d\n", current_sample);
-            prev = samples[current_sample].value;
-            printf("Prev is -%s-\n", prev);
+
+            // printf("End of current sample, which is %d\n", current_sample);
             strcat(samples[current_sample].value, name);
             strcat(samples[current_sample].value, "=");
             strcat(samples[current_sample].value, value);
 
             samples[current_sample].sample_number = current_sample + 1;      
-            printf("Sample %d: -%s-\n", current_sample, samples[current_sample].value);      
+            //printf("Sample %d: -%s-\n", current_sample, samples[current_sample].value);      
             current_sample++;
-            dupe = 1;
-            printf("dupe=%d\n", dupe);
-            }
-            
         }
-        else{
-            dupe = 0;
-            strcat(samples[current_sample].value, name);
-            strcat(samples[current_sample].value, "=");
-            strcat(samples[current_sample].value, value);
-            strcat(samples[current_sample].value, ", ");
-            prev = samples[current_sample].value;
-            printf("ELSE BLOCK has prev=%s\n", prev);
-        }
+        // else{
+        //     strcat(samples[current_sample].value, name);
+        //     strcat(samples[current_sample].value, "=");
+        //     strcat(samples[current_sample].value, value);
+        //     strcat(samples[current_sample].value, ", ");
+        //     numAdded++;
+        // }
         //printf("\n");
 
-        int name_found = 0;
+        //int name_found = 0;
 
-        //prev_val[j] = name = value of the last named object
+        //unique_names[j] = name, so prev_values[j]= the last value of that named object
         for (j = 0; j < num_unique_names; j++) {
             if (strcmp(name, unique_names[j]) == 0) {
-                name_found = 1;
                 strcpy(prev_values[j],value);
-                //printf("Prev_val[j]=%s \n", prev_values[j]);
                 break;
             }
         }
