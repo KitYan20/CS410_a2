@@ -8,13 +8,14 @@ OBJS = myshell.o
 .PHONY: all clean
 .SILENT: clean
 all: myshell
+TAPPER: tapper observe reconstruct
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tapper: tapper.o
-	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@
+	$(CC) ${OPT} ${DEBUG} $^ -lrt -o $@  
 observe: observe.o
-	$(CC) ${OPT} ${DEBUG} -lrt $^ -o $@	
+	$(CC) ${OPT} ${DEBUG} $^ -lrt -o $@ 
 reconstruct: reconstruct.o
-	$(CC) ${OPT} ${DEBUG} $^ -o $@
+	$(CC) ${OPT} ${DEBUG} $^ -lrt -o $@ 
 clean:
 	rm *.o myshell observe tapper reconstruct

@@ -2,17 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #define MAX_NAME_LEN 100
 #define MAX_VALUE_LEN 1064
 #define MAX_NAMES 100
-#define SHARED_MEM_SIZE 1064
 
-//Initialize a struct data type to store our name_value object
+#define BUFFER_SIZE 10
+#define MAX_VALUE_SIZE 1064
+
+typedef struct {
+    char data[BUFFER_SIZE][MAX_VALUE_SIZE];
+    int in;
+    int out;
+    int done;
+
+} RingBuffer;
+
 typedef struct {
     char name_value[MAX_VALUE_LEN];
 } NameValue;
@@ -23,19 +30,20 @@ int main() {
     int num_unique_names = 0;//This will be our counter to count how many name_value pairs are stored 
     char result[256];//A result string to combine both the name and value of a input line
 
-    //shm_open creates and opens a new, or opens an existing, POSIX shared memory object.
-    int shm_fd = shm_open("/observe_shm", O_CREAT | O_RDWR ,0666);
+    key_t shm_key = ftok(".",'R');
+    int shm_id = shmget(shm_key,sizeof(RingBuffer),0666);
+    if (shm_id < 0) {
+        perror("shmget");
+        exit(1);
+    }
+    /* Attach shared memory segment to shared_data */
+    RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
 
-    if (shm_fd == -1){
-        printf("Error opening a shared memory object");
-        exit(EXIT_FAILURE);
+    if (ring_buffer == (void*)-1){
+        perror("shmat");
+        exit(1);
     }
-    ftruncate(shm_fd, SHARED_MEM_SIZE);//Truncate the shm_fd to be truncated to a size of precisely length bytes.
-    char *shared_mem = mmap(NULL,SHARED_MEM_SIZE,PROT_READ | PROT_WRITE, MAP_SHARED,shm_fd,0);
-    if (shared_mem == MAP_FAILED){
-        printf("Error creating a new mapping in the virtual address space");
-        exit(EXIT_FAILURE);
-    }
+
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
         if (equals_sign != NULL) {
@@ -61,24 +69,27 @@ int main() {
             if (existing_name_index == 0){
                 strcpy(unique_names[num_unique_names].name_value,result);//Copy the result of the string into the corresponding indice into the struct
                 num_unique_names++;//Increment to move on to the next position
+
+                //printf("%s\n",ring_buffer->data[ring_buffer->write_index]);
+                while((ring_buffer->in + 1) % BUFFER_SIZE == ring_buffer->out);//wait if buffer is full
+                //Write the observe change to ring buffer
+                strcpy(ring_buffer->data[ring_buffer->in],result);
+                //printf("Producer produces %s\n",ring_buffer->data[ring_buffer->in]);
+                ring_buffer->in = (ring_buffer->in + 1) % BUFFER_SIZE;//Move on to the next slot in the buffer using modulo
+
+                //sleep(1);
+                
             }
             memset(result,'\0',sizeof(result));
         }
     }
-    // for (int i = 0; i < num_unique_names; i++){
-    //     printf("%s ", unique_names[i].name_value);
 
-    // }
-    char *shared_mem_ptr = shared_mem;
-    for (int i = 0; i < num_unique_names; i++){
-        strcpy(shared_mem_ptr,unique_names[i].name_value);
-        shared_mem_ptr += strlen(unique_names[i].name_value) + 1;
-        printf("%s ", unique_names[i].name_value);
-
+    ring_buffer->done = 1;//Ring buffer is done processing
+    //Detach shared memory segment
+    if (shmdt(ring_buffer) == -1) {
+        perror("shmdt");
+        exit(1);
     }
 
-    //unmapped and close the shared memory region
-    munmap(shared_mem,SHARED_MEM_SIZE);
-    close(shm_fd);
     return 0;
 }

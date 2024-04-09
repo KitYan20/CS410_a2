@@ -1,0 +1,11 @@
+Consumer produce expt=1,
+Consumer produce temperature=60 F,
+Consumer produce time=10 s,
+Consumer produce time=20 s,
+Consumer produce temperature=61 F,
+Consumer produce time=30 s,
+Consumer produce expt=2,
+Consumer produce temperature=64 F,
+Consumer produce time=40 s,
+Consumer produce time=50 s
+

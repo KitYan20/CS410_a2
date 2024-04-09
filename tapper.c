@@ -6,22 +6,31 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ipc.h>
 #include <fcntl.h>
+#include <sys/shm.h>
 
 #define MAX_PROGRAMS 4
-#define SHARED_MEM_SIZE 1024
+#define SHM_SIZE 1024
+#define MAX_VALUE_SIZE 1064
+#define BUFFER_SIZE 10
 
 typedef struct {
     char *name;
-    char *arg;
 } Programs;
+
+typedef struct {
+    char data[BUFFER_SIZE][MAX_VALUE_SIZE];
+    int in;
+    int out;
+    int done;
+}RingBuffer;
 
 
 int main(int argc, char *argv[]){
     int is_sync = 0;
     int buffer_size = 1;
     char *test;
-    char *program1 = NULL, *program2 = NULL, *program3 = NULL, *arg3 = NULL;
     int optional;
     int opt;
     Programs programs[MAX_PROGRAMS];
@@ -29,19 +38,9 @@ int main(int argc, char *argv[]){
     while((opt = getopt(argc,argv, "p:b:s:o:")) != -1){
         switch (opt){
             case 'p':
-                // if (optarg[0] == '1'){
-                //     printf("%c",optarg[0]);
-                //     program1 = optarg + 2;
-                // }else if (optarg[0] == '2'){
-                //     printf("%c",optarg[0]);
-                //     program2 = optarg + 2;
-                // }else if (optarg[0] == '3'){
-                //     printf("%c",optarg[0]);
-                //     program3 = optarg + 2;
-                // }
                 if (num_programs < MAX_PROGRAMS){
                     programs[num_programs].name= optarg + 2;
-                    programs[num_programs].arg = NULL;
+                    num_programs++;
                 
                 }
                 break;
@@ -61,43 +60,56 @@ int main(int argc, char *argv[]){
         }
     }
     //printf("tapper -p1 %s -p2 %s -p3 %s -o %d -b %d -s %d", program1,program2,program3,optional,is_sync,buffer_size);
-
-        //shm_open creates and opens a new, or opens an existing, POSIX shared memory object.
-    int shm_fd = shm_open("/observe_shm", O_CREAT | O_RDWR , 0666);
-
-    if (shm_fd == -1){
-        printf("Error opening a shared memory object");
-        exit(EXIT_FAILURE);
+    key_t shm_key = ftok(".",'R');
+    
+    int shm_id = shmget(shm_key,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
+    // Create shared memory segment
+    if (shm_id < 0) {
+        perror("shmget meme");
+        exit(1);
     }
-    ftruncate(shm_fd, SHARED_MEM_SIZE);//Truncate the shm_fd to be truncated to a size of precisely length bytes.
-    char *shared_mem = mmap(NULL,SHARED_MEM_SIZE,PROT_READ | PROT_WRITE, MAP_SHARED,shm_fd,0);
+    /* Attach shared memory segment to shared_data */    
+    RingBuffer *ring_buffer;
+    ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
+    // printf("shm id %d\n",shm_id);
+    // printf("ring buffer address 0x%x\n",ring_buffer);
 
-    if (shared_mem == MAP_FAILED){
-        printf("Error creating a new mapping in the virtual address space");
-        exit(EXIT_FAILURE);
+    if (ring_buffer == (void*)-1){//Memory address of the shared memory segment
+        perror("Meme shmat");
+        exit(1);
     }
-    //fork a child process for observe
-    pid_t pid = fork();
-    //The execl() function replaces the current process image with a new process image specified by path
-    if (pid == 0){  
-        execl(programs[0].name,programs[0].name,programs[0].arg,NULL);
-        perror("execl");
-        exit(EXIT_FAILURE);
-
-    }else if (pid < 0){
-        fprintf(stderr,"Error forking");
-        exit(EXIT_FAILURE);
+    //Initialize the ring buffer
+    ring_buffer->in = 0;
+    ring_buffer->out = 0;
+    ring_buffer->done = 0;
+    pid_t pids[MAX_PROGRAMS];
+    //Fork and execute observe and reconstruct processes
+    for (int i = 0; i < num_programs ; i++){
+        // pid_t pid = fork();
+        pids[i] = fork();
+        if (pids[i] == 0){ //child process
+            execl(programs[i].name, programs[i].name, NULL);
+            perror("execl");
+            exit(EXIT_FAILURE);
+        }else if (pids[i] < 0){
+            fprintf(stderr, "Error forking");
+            exit(EXIT_FAILURE);
+        }
+    }
+    // Wait for child processes to complete
+    for (int i = 0 ; i < num_programs ; i++){
+        waitpid(pids[i], NULL, 0);
+    }
+    //Detach shared memory segment
+    if (shmdt(ring_buffer) == -1) {
+        perror("shmdt");
+        exit(1);
     }
 
-    wait(NULL);
-
-    char *shared_mem_ptr = shared_mem;
-    while(*shared_mem_ptr != '\0'){
-        printf("%s ",shared_mem_ptr);
-        shared_mem_ptr += strlen(shared_mem_ptr)+1;
+    // Delete shared memory segment
+    if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+        exit(1);
     }
-    munmap(shared_mem,SHARED_MEM_SIZE);
-    close(shm_fd);
-    shm_unlink("/observe_shm");
     return 0;
 }
