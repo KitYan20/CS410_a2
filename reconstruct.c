@@ -24,14 +24,8 @@ typedef struct {
     char value[MAX_NAMES];
 } Sample;
 
-char *trim_leading_space(char *str){
-    while(isspace(*str)){
-        str++;
-    }
-    return str;
-}
 
-void sync_reconstruct(int buffer_size){
+void sync_reconstruct(int buffer_size,int argn){
     Sample samples[MAX_SAMPLES];
     char *input_samples[MAX_SAMPLES];
     char *meme[MAX_SAMPLES];
@@ -66,7 +60,7 @@ void sync_reconstruct(int buffer_size){
         while(ring_buffer->in == ring_buffer->out && !ring_buffer->done);//wait if buffer is empty
         
         if (ring_buffer->done && ring_buffer->in == ring_buffer->out){//Finished reading all the data in the slots
-            printf("Break\n");
+            // printf("Break\n");
             break;
         }
         meme[num_inputs] = ring_buffer->data[ring_buffer->out];
@@ -82,34 +76,16 @@ void sync_reconstruct(int buffer_size){
     
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
-        
-        
         if (comma != NULL){
             *comma = '\0';
         }
-    
-        // //printf("Comma_1=%s\n", meme[i]);
-        // char *token = meme[i];
-        // char* name = strtok(, "=");
-        // char* value = strtok(NULL, "=");
-
-        //printf("name=%s, v=%s\n", name, value );
-        // strcat(result,name);
-        // strcat(result,"=");
-        // strcat(result,value);
-        // input_samples[i] = result;
-        // //printf("Consumer produce %s\n", input_samples[i]);
-        // memset(result,'\0',sizeof(result));
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
-        //printf("%s\n", meme[i]);
-     
         char *token = strdup(meme[i]);
-        //printf("token=%s\n",token);
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
-        //printf("name=%s,value=%s\n\n",name,value);
+
         for (j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
@@ -133,10 +109,8 @@ void sync_reconstruct(int buffer_size){
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
         char *token = meme[i];
-        printf("token=%s\n",token);
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
-        printf("name=%s, v=%s\n", name, value);
         // now we have name and value
         // if this sample's name is the end name, wrap up this sample 
         if (strcmp(name, end_name) == 0) {
@@ -167,10 +141,30 @@ void sync_reconstruct(int buffer_size){
 
     }
 
-
+    FILE *gnuplot_file = fopen("data.txt", "w");
+    if (gnuplot_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
     for (i = 0; i < current_sample; i++) {
         printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+        char *token = strtok(samples[i].value, ",");
+        int field_count = 1;
+        while (token != NULL) {
+            if (field_count == argn) {
+                char *value = strchr(token, '=');
+                if (value != NULL) {
+                    value++;
+                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
+                }
+                break;
+            }
+            token = strtok(NULL, ",");
+            field_count++;
+        }
+        
     }
+    fclose(gnuplot_file);
 
 
     //Detach shared memory segment
@@ -230,11 +224,14 @@ void async_reconstruct(){
     }
     
 }
+
 int main(int argc, char *argv[]){
     int buffer_size = atoi(argv[1]);
+    int argn = atoi(argv[2]);
     char *buffer_option = argv[3];
+    printf("%d",argn);
     if (strcmp(buffer_option,"sync") == 0){
-        sync_reconstruct(buffer_size);
+        sync_reconstruct(buffer_size,argn);
     }else{
         async_reconstruct();
     }

@@ -8,7 +8,7 @@ OBJS = myshell.o
 .PHONY: all clean
 .SILENT: clean
 all: myshell
-TAPPER: tapper observe reconstruct
+TAPPER: tapper observe reconstruct tapplot
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tapper: tapper.o
@@ -17,5 +17,7 @@ observe: observe.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
 reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
+tapplot: tapplot.o
+	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
 clean_tapper:
-	rm *.o observe tapper reconstruct
+	rm *.o observe tapper reconstruct tapplot
