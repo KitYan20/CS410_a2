@@ -88,11 +88,12 @@ void sync_reconstruct(int buffer_size){
             *comma = '\0';
         }
     
-        //printf("Comma_1=%s\n", meme[i]);
-        char* name = strtok(meme[i], "=");
-        char* value = strtok(NULL, "=");
+        // //printf("Comma_1=%s\n", meme[i]);
+        // char *token = meme[i];
+        // char* name = strtok(, "=");
+        // char* value = strtok(NULL, "=");
 
-        printf("name=%s, v=%s\n", name, value );
+        //printf("name=%s, v=%s\n", name, value );
         // strcat(result,name);
         // strcat(result,"=");
         // strcat(result,value);
@@ -103,11 +104,12 @@ void sync_reconstruct(int buffer_size){
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
         //printf("%s\n", meme[i]);
-        char *token = meme[i];
-        //printf("%s",token);
+     
+        char *token = strdup(meme[i]);
+        //printf("token=%s\n",token);
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
-
+        //printf("name=%s,value=%s\n\n",name,value);
         for (j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
@@ -126,21 +128,16 @@ void sync_reconstruct(int buffer_size){
         }
         
     }
-    // printf("%d\n",num_unique_names);
-    // for (int i = 0; i < num_unique_names;i++){
-    //     printf("%s\n",unique_names[i]);
-    // }
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
     
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
-        printf("s=%s\n",meme[i]);
-        char* name = strtok(meme[i], "=");
+        char *token = meme[i];
+        printf("token=%s\n",token);
+        char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
         printf("name=%s, v=%s\n", name, value);
         // now we have name and value
-        //printf("Name=%s | value=%s\n", name, value);
-
         // if this sample's name is the end name, wrap up this sample 
         if (strcmp(name, end_name) == 0) {
             for (j = 0; j < num_unique_names - 1; j++) {
