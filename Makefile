@@ -17,5 +17,5 @@ observe: observe.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
 reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
-clean:
-	rm *.o myshell observe tapper reconstruct
+clean_tapper:
+	rm *.o observe tapper reconstruct

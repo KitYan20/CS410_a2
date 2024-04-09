@@ -10,6 +10,8 @@
 
 #define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
+#define MAX_SAMPLES 1064
+#define MAX_NAMES 256
 
 // typedef struct {
 //     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
@@ -17,8 +19,28 @@
 //     int out;
 //     int done;
 // } RingBuffer;
+typedef struct {
+    int sample_number;
+    char value[MAX_NAMES];
+} Sample;
+
+char *trim_leading_space(char *str){
+    while(isspace(*str)){
+        str++;
+    }
+    return str;
+}
 
 void sync_reconstruct(int buffer_size){
+    Sample samples[MAX_SAMPLES];
+    char *input_samples[MAX_SAMPLES];
+    char *meme[MAX_SAMPLES];
+    int num_inputs = 0;
+    char unique_names[MAX_NAMES][MAX_NAMES];
+    int num_unique_names = 0;
+    char end_name[MAX_NAMES];
+    int current_sample = 0;
+    int i, j;
     typedef struct {
         char data[buffer_size][MAX_VALUE_SIZE];
         int in;
@@ -38,23 +60,110 @@ void sync_reconstruct(int buffer_size){
         perror("shmat");
         exit(1);
     }
-
+    char result[256];
     while(1){
         // Read observed changes from the ring buffer
         while(ring_buffer->in == ring_buffer->out && !ring_buffer->done);//wait if buffer is empty
         
         if (ring_buffer->done && ring_buffer->in == ring_buffer->out){//Finished reading all the data in the slots
+            printf("Break\n");
             break;
         }
-        
-        printf("Consumer produce %s\n", ring_buffer->data[ring_buffer->out]);
-
+        meme[num_inputs] = ring_buffer->data[ring_buffer->out];
+        input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
+        strcat(result,ring_buffer->data[ring_buffer->out]);
+        num_inputs++;
         ring_buffer->out = (ring_buffer->out + 1) % BUFFER_SIZE;//Move on the next name value pair to read
-        // sleep(2);
+        //sleep(2);
         
  
     }
     printf("\n");
+
+    for (int i = 0; i < num_inputs; i++){
+        char *comma = strchr(meme[i],',');
+        char *comma_1 = strchr(input_samples[i],',');
+        printf("Comma_1=%s\n", meme[i]);
+        if (comma != NULL){
+            *comma = '\0';
+        }
+        if (comma_1 != NULL){
+            *comma_1 = '\0';
+        }   
+        //printf("Consumer produce %s\n", meme[i]);
+    }
+    for (int i = 0; i < num_inputs; i++){
+        int is_new_name = 1;
+        //printf("%s\n", meme[i]);
+        char *name = strtok(meme[i], "=");
+        for (j = 0; j < num_unique_names; j++) {
+            if (strcmp(unique_names[j], name) == 0) {
+                is_new_name = 0;
+                break;
+            }
+        }
+        if (is_new_name) {
+            strcpy(unique_names[num_unique_names], name);
+            num_unique_names++;
+            if (num_unique_names == MAX_NAMES) {
+                fprintf(stderr, "Error: Maximum number of unique names exceeded\n");
+                
+            }
+        } else {//Gets the last name from observe program
+            strcpy(end_name, name);
+        }
+        
+    }
+    printf("%d\n",num_unique_names);
+    for (int i = 0; i < num_unique_names;i++){
+        printf("%s\n",unique_names[i]);
+    }
+    char prev_values[MAX_NAMES][MAX_NAMES] = {0};
+    
+    // loop through all input data tokens to fill samples[] 
+    for (i = 0; i < num_inputs; i++) {
+        printf("s=%s\n",input_samples[i]);
+        char* name = strtok(input_samples[i], "=");
+        char* value = strtok(NULL, "=");
+        printf("name=%s, v=%s\n", name, value);
+        // now we have name and value
+        //printf("Name=%s | value=%s\n", name, value);
+
+        // if this sample's name is the end name, wrap up this sample 
+        if (strcmp(name, end_name) == 0) {
+            for (j = 0; j < num_unique_names - 1; j++) {
+                strcat(samples[current_sample].value, unique_names[j]);
+                strcat(samples[current_sample].value, "=");
+                strcat(samples[current_sample].value, prev_values[j]);
+                strcat(samples[current_sample].value, ", ");
+            }
+
+            // printf("End of current sample, which is %d\n", current_sample);
+            strcat(samples[current_sample].value, name);
+            strcat(samples[current_sample].value, "=");
+            strcat(samples[current_sample].value, value);
+
+            samples[current_sample].sample_number = current_sample + 1;      
+            //printf("Sample %d: -%s-\n", current_sample, samples[current_sample].value);      
+            current_sample++;
+        }
+
+        //unique_names[j] = name, so prev_values[j]= the last value of that named object
+        for (j = 0; j < num_unique_names; j++) {
+            if (strcmp(name, unique_names[j]) == 0) {
+                strcpy(prev_values[j],value);
+                break;
+            }
+        }
+
+    }
+
+
+    for (i = 0; i < current_sample; i++) {
+        printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+    }
+
+
     //Detach shared memory segment
     if (shmdt(ring_buffer) == -1) {
         perror("shmdt");
