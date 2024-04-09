@@ -17,21 +17,22 @@
 
 typedef struct {
     char *name;
+    int optional;
 } Programs;
 
-typedef struct {
-    char data[BUFFER_SIZE][MAX_VALUE_SIZE];
-    int in;
-    int out;
-    int done;
-}RingBuffer;
+// typedef struct {
+//     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
+//     int in;
+//     int out;
+//     int done;
+// }RingBuffer;
 
 
 int main(int argc, char *argv[]){
     int is_sync = 0;
     int buffer_size = 1;
     char *test;
-    int optional;
+    int optional = 1;
     int opt;
     Programs programs[MAX_PROGRAMS];
     int num_programs = 0;
@@ -40,8 +41,8 @@ int main(int argc, char *argv[]){
             case 'p':
                 if (num_programs < MAX_PROGRAMS){
                     programs[num_programs].name= optarg + 2;
+                     
                     num_programs++;
-                
                 }
                 break;
             case 'b':
@@ -60,6 +61,12 @@ int main(int argc, char *argv[]){
         }
     }
     //printf("tapper -p1 %s -p2 %s -p3 %s -o %d -b %d -s %d", program1,program2,program3,optional,is_sync,buffer_size);
+    typedef struct {
+        char data[buffer_size][MAX_VALUE_SIZE];
+        int in;
+        int out;
+        int done;
+    }RingBuffer;
     key_t shm_key = ftok(".",'R');
     
     int shm_id = shmget(shm_key,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
@@ -83,12 +90,18 @@ int main(int argc, char *argv[]){
     ring_buffer->out = 0;
     ring_buffer->done = 0;
     pid_t pids[MAX_PROGRAMS];
+    char optional_argument[256];
+    char buff_size[256];
+    snprintf(optional_argument,sizeof(optional_argument),"%d",optional);
+    snprintf(buff_size,sizeof(buff_size),"%d",buffer_size);
     //Fork and execute observe and reconstruct processes
     for (int i = 0; i < num_programs ; i++){
         // pid_t pid = fork();
         pids[i] = fork();
+        
         if (pids[i] == 0){ //child process
-            execl(programs[i].name, programs[i].name, NULL);
+    
+            execl(programs[i].name, programs[i].name,buff_size,optional_argument, NULL);
             perror("execl");
             exit(EXIT_FAILURE);
         }else if (pids[i] < 0){

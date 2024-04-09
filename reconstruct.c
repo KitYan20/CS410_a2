@@ -10,15 +10,23 @@
 #define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
 
-typedef struct {
-    char data[BUFFER_SIZE][MAX_VALUE_SIZE];
-    int in;
-    int out;
-    int done;
-} RingBuffer;
+// typedef struct {
+//     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
+//     int in;
+//     int out;
+//     int done;
+// } RingBuffer;
 
 
-int main(){
+int main(int argc, char *argv[]){
+    int buffer_size = atoi(argv[1]);
+    typedef struct {
+        char data[buffer_size][MAX_VALUE_SIZE];
+        int in;
+        int out;
+        int done;
+
+    } RingBuffer;
     key_t shm_key = ftok(".",'R');
     int shm_id = shmget(shm_key,sizeof(RingBuffer), 0666);
     if (shm_id < 0) {

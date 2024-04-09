@@ -12,19 +12,30 @@
 #define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
 
-typedef struct {
-    char data[BUFFER_SIZE][MAX_VALUE_SIZE];
-    int in;
-    int out;
-    int done;
+// typedef struct {
+//     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
+//     int in;
+//     int out;
+//     int done;
 
-} RingBuffer;
+// } RingBuffer;
 
 typedef struct {
     char name_value[MAX_VALUE_LEN];
 } NameValue;
 
-int main() {
+int main(int argc, char *argv[]) {
+    
+    printf("Buffer size %d\n",atoi(argv[1]));
+    int buffer_size = atoi(argv[1]);
+    typedef struct {
+        char data[buffer_size][MAX_VALUE_SIZE];
+        int in;
+        int out;
+        int done;
+
+    } RingBuffer;
+
     char input[256];//Initialize an array of chars to store our line of inputs from stdin or a file
     NameValue unique_names[MAX_NAMES];//create our NameValue struct data type object with size up to 100 names
     int num_unique_names = 0;//This will be our counter to count how many name_value pairs are stored 
