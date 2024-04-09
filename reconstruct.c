@@ -79,23 +79,35 @@ void sync_reconstruct(int buffer_size){
  
     }
     printf("\n");
-
+    
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
-        char *comma_1 = strchr(input_samples[i],',');
-        printf("Comma_1=%s\n", meme[i]);
+        
+        
         if (comma != NULL){
             *comma = '\0';
         }
-        if (comma_1 != NULL){
-            *comma_1 = '\0';
-        }   
-        //printf("Consumer produce %s\n", meme[i]);
+    
+        //printf("Comma_1=%s\n", meme[i]);
+        char* name = strtok(meme[i], "=");
+        char* value = strtok(NULL, "=");
+
+        printf("name=%s, v=%s\n", name, value );
+        // strcat(result,name);
+        // strcat(result,"=");
+        // strcat(result,value);
+        // input_samples[i] = result;
+        // //printf("Consumer produce %s\n", input_samples[i]);
+        // memset(result,'\0',sizeof(result));
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
         //printf("%s\n", meme[i]);
-        char *name = strtok(meme[i], "=");
+        char *token = meme[i];
+        //printf("%s",token);
+        char *name = strtok(token, "=");
+        char* value = strtok(NULL, "=");
+
         for (j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
@@ -114,16 +126,16 @@ void sync_reconstruct(int buffer_size){
         }
         
     }
-    printf("%d\n",num_unique_names);
-    for (int i = 0; i < num_unique_names;i++){
-        printf("%s\n",unique_names[i]);
-    }
+    // printf("%d\n",num_unique_names);
+    // for (int i = 0; i < num_unique_names;i++){
+    //     printf("%s\n",unique_names[i]);
+    // }
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
     
     // loop through all input data tokens to fill samples[] 
-    for (i = 0; i < num_inputs; i++) {
-        printf("s=%s\n",input_samples[i]);
-        char* name = strtok(input_samples[i], "=");
+    for (int i = 0; i < num_inputs; i++) {
+        printf("s=%s\n",meme[i]);
+        char* name = strtok(meme[i], "=");
         char* value = strtok(NULL, "=");
         printf("name=%s, v=%s\n", name, value);
         // now we have name and value
