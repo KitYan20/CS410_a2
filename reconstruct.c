@@ -64,8 +64,9 @@ void sync_reconstruct(int buffer_size,int argn){
             break;
         }
         meme[num_inputs] = ring_buffer->data[ring_buffer->out];
-        input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
-        strcat(result,ring_buffer->data[ring_buffer->out]);
+        //input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
+        printf("%s\n",meme[num_inputs]);
+        
         num_inputs++;
         ring_buffer->out = (ring_buffer->out + 1) % BUFFER_SIZE;//Move on the next name value pair to read
         //sleep(2);
@@ -73,12 +74,13 @@ void sync_reconstruct(int buffer_size,int argn){
  
     }
     printf("\n");
-    
+    printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
         if (comma != NULL){
             *comma = '\0';
         }
+        printf("%s\n",meme[i]);
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
@@ -105,7 +107,7 @@ void sync_reconstruct(int buffer_size,int argn){
         
     }
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
-    
+    printf("%d\n",num_unique_names);
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
         char *token = meme[i];
@@ -140,31 +142,35 @@ void sync_reconstruct(int buffer_size,int argn){
         }
 
     }
-
-    FILE *gnuplot_file = fopen("data.txt", "w");
-    if (gnuplot_file == NULL) {
-        perror("Error opening file");
-        exit(1);
-    }
+    printf("curr %d\n",current_sample);
     for (i = 0; i < current_sample; i++) {
         printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
-        char *token = strtok(samples[i].value, ",");
-        int field_count = 1;
-        while (token != NULL) {
-            if (field_count == argn) {
-                char *value = strchr(token, '=');
-                if (value != NULL) {
-                    value++;
-                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-                }
-                break;
-            }
-            token = strtok(NULL, ",");
-            field_count++;
-        }
-        
     }
-    fclose(gnuplot_file);
+
+    // FILE *gnuplot_file = fopen("data.txt", "w");
+    // if (gnuplot_file == NULL) {
+    //     perror("Error opening file");
+    //     exit(1);
+    // }
+    // for (i = 0; i < current_sample; i++) {
+    //     printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+    //     char *token = strtok(samples[i].value, ",");
+    //     int field_count = 1;
+    //     while (token != NULL) {
+    //         if (field_count == argn) {
+    //             char *value = strchr(token, '=');
+    //             if (value != NULL) {
+    //                 value++;
+    //                 fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
+    //             }
+    //             break;
+    //         }
+    //         token = strtok(NULL, ",");
+    //         field_count++;
+    //     }
+        
+    // }
+    // fclose(gnuplot_file);
 
 
     //Detach shared memory segment

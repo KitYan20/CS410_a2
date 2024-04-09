@@ -12,9 +12,8 @@ temperature=64 F,
 time=40 s,
 expt=2,
 temperature=64 F,
-time=50 s
-
-
+time=50 s,
+time=60 s
 
 
 
