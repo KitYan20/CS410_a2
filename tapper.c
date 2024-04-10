@@ -12,7 +12,7 @@
 #include <semaphore.h>
 
 
-#define MAX_PROGRAMS 4
+#define MAX_PROGRAMS 100
 #define SHM_SIZE 1024
 #define MAX_VALUE_SIZE 1064
 #define BUFFER_SIZE 10
@@ -184,11 +184,8 @@ int main(int argc, char *argv[]){
     while((opt = getopt(argc,argv, "p:b:s:o:")) != -1){
         switch (opt){
             case 'p':
-                if (num_programs < MAX_PROGRAMS){
-                    programs[num_programs].name= optarg + 2;
-                     
-                    num_programs++;
-                }
+                programs[num_programs].name= optarg + 2;
+                num_programs++;
                 break;
             case 'b':
                 if (strcmp(optarg,"sync") == 0){
