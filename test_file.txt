@@ -13,6 +13,8 @@ time=40 s,
 expt=2,
 temperature=64 F,
 time=50 s,
+expt=3,
+temperature=70F,
 time=60 s
 
 

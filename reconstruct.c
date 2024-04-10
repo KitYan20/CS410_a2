@@ -66,7 +66,7 @@ void sync_reconstruct(int buffer_size,int argn){
         meme[num_inputs] = ring_buffer->data[ring_buffer->out];
         //input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
         printf("%s\n",meme[num_inputs]);
-        
+        printf("%d\n",num_inputs);
         num_inputs++;
         ring_buffer->out = (ring_buffer->out + 1) % BUFFER_SIZE;//Move on the next name value pair to read
         //sleep(2);
@@ -74,13 +74,16 @@ void sync_reconstruct(int buffer_size,int argn){
  
     }
     printf("\n");
+    for (i = 0; i < num_inputs; i++){
+        printf("%s\n",meme[i]);
+    }
     printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
         if (comma != NULL){
             *comma = '\0';
         }
-        printf("%s\n",meme[i]);
+        //printf("%s\n",meme[i]);
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
