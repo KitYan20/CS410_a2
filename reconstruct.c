@@ -25,7 +25,7 @@ typedef struct {
 } Sample;
 
 
-void sync_reconstruct(int buffer_size,int argn){
+void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
     char *input_samples[MAX_SAMPLES];
     char *meme[MAX_SAMPLES];
@@ -40,12 +40,12 @@ void sync_reconstruct(int buffer_size,int argn){
         int out;
         int done;
     } RingBuffer;
-    key_t shm_key = ftok(".",'R');
-    int shm_id = shmget(shm_key,sizeof(RingBuffer), 0666);
-    if (shm_id < 0) {
-        perror("shmget");
-        exit(1);
-    }
+    // key_t shm_key = ftok(".",'R');
+    // int shm_id = shmget(shm_key,sizeof(RingBuffer), 0666);
+    // if (shm_id < 0) {
+    //     perror("shmget");
+    //     exit(1);
+    // }
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
 
@@ -53,6 +53,17 @@ void sync_reconstruct(int buffer_size,int argn){
         perror("shmat");
         exit(1);
     }
+
+    RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
+    ring_buffer_2->in = 0;
+    ring_buffer_2->out = 0;
+    ring_buffer_2->done = 0;
+
+    if (ring_buffer_2 == (void*)-1){
+        perror("shmat");
+        exit(1);
+    }
+    
     
     while(1){
         
@@ -65,7 +76,7 @@ void sync_reconstruct(int buffer_size,int argn){
         }
         char *result = strdup(ring_buffer->data[ring_buffer->out]);
         meme[num_inputs] = result;
-        ring_buffer->out = (ring_buffer->out + 1) % BUFFER_SIZE;//Move on the next name value pair to read
+        ring_buffer->out = (ring_buffer->out + 1) % buffer_size;//Move on the next name value pair to read
         num_inputs++;
         // sleep(2); 
     }
@@ -146,31 +157,63 @@ void sync_reconstruct(int buffer_size,int argn){
         perror("Error opening file");
         exit(1);
     }
-    for (int i = 0; i < current_sample; i++) {
-        printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
-        char *token = strtok(samples[i].value, ",");
-        int field_count = 1;
-        while (token != NULL) {
-            if (field_count == argn) {
-                char *value = strchr(token, '=');
-                if (value != NULL) {
-                    value++;
-                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-                }
-                break;
-            }
-            token = strtok(NULL, ",");
-            field_count++;
-        }
+    // for (int i = 0; i < current_sample; i++) {
+    //     printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+    //     char *token = strtok(samples[i].value, ",");
+    //     int field_count = 1;
+    //     while (token != NULL) {
+    //         if (field_count == argn) {
+    //             char *value = strchr(token, '=');
+    //             if (value != NULL) {
+    //                 value++;
+    //                 fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
+    //             }
+    //             break;
+    //         }
+    //         token = strtok(NULL, ",");
+    //         field_count++;
+    //     }
         
-    }
-    fclose(gnuplot_file);
+    // }
+    char reconstructed_sample[MAX_VALUE_SIZE];
+    //strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[0].value);
+    //printf("Producer produce %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+    int i = 0;
 
+    while(i < current_sample){
+        while((ring_buffer_2->in + 1) % BUFFER_SIZE == ring_buffer_2->out){
+            sleep(1);
+        }
+        strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+        printf("Producer produce %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+        ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;
+        i++;
+        sleep(1);
+    }
+    
+    ring_buffer_2->done = 1;
+    printf("Done\n");
+    // for (int i = 0; i < current_sample; i++){
+        
+    //     printf("%s",sampe);
+    //         // while((ring_buffer_2->in + 1) % BUFFER_SIZE == ring_buffer_2->out){
+    //         //     // Buffer is full, wait for space to become available
+    //         //     sleep(1);
+    //         // };
+    //         // // reconstructed_sample = samples[i].value;
+    //         // strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+    //         // ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;
+    // }
+    fclose(gnuplot_file);
 
     //Detach shared memory segment
     if (shmdt(ring_buffer) == -1) {
         perror("shmdt");
         exit(1);
+    }
+    if (shmdt(ring_buffer_2) == -1) {
+    perror("shmdt");
+    exit(1);
     }
 }
 
@@ -319,9 +362,12 @@ int main(int argc, char *argv[]){
     int buffer_size = atoi(argv[1]);
     int argn = atoi(argv[2]);
     char *buffer_option = argv[3];
+    int shm_id = atoi(argv[4]);
+    int shm_id_2 = atoi(argv[5]);
     // printf("%d",argn);
+    
     if (strcmp(buffer_option,"sync") == 0){
-        sync_reconstruct(buffer_size,argn);
+        sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
     }else{
         async_reconstruct();
     }
