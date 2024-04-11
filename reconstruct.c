@@ -34,7 +34,6 @@ void sync_reconstruct(int buffer_size,int argn){
     int num_unique_names = 0;
     char end_name[MAX_NAMES];
     int current_sample = 0;
-    int i, j;
     typedef struct {
         char data[buffer_size][MAX_VALUE_SIZE];
         int in;
@@ -64,31 +63,17 @@ void sync_reconstruct(int buffer_size,int argn){
             // printf("Break\n");
             break;
         }
-        // meme[num_inputs] = ring_buffer->data[ring_buffer->out];
         char *result = strdup(ring_buffer->data[ring_buffer->out]);
-        
-        //input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
-        // printf("%s\n",meme[num_inputs]);
-        // printf("%d\n",num_inputs);
         meme[num_inputs] = result;
-        
         ring_buffer->out = (ring_buffer->out + 1) % BUFFER_SIZE;//Move on the next name value pair to read
-       
         num_inputs++;
-        // sleep(2);
-        
-        // printf("Iteration %d\n",num_inputs);
-        // for (i = 0; i < num_inputs; i++){
-        // printf("[%d] %s\n",i,meme[i]);
-        // }
-        
- 
+        // sleep(2); 
     }
     printf("\n");
     // for (i = 0; i < num_inputs; i++){
     //     printf("[%d] %s\n",i,meme[i]);
     // }
-    printf("Num inputs %d\n",num_inputs);
+    //printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
         if (comma != NULL){
@@ -102,7 +87,7 @@ void sync_reconstruct(int buffer_size,int argn){
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
 
-        for (j = 0; j < num_unique_names; j++) {
+        for (int j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
                 break;
@@ -121,7 +106,7 @@ void sync_reconstruct(int buffer_size,int argn){
         
     }
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
-    printf("%d\n",num_unique_names);
+    // printf("%d\n",num_unique_names);
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
         char *token = meme[i];
@@ -130,7 +115,7 @@ void sync_reconstruct(int buffer_size,int argn){
         // now we have name and value
         // if this sample's name is the end name, wrap up this sample 
         if (strcmp(name, end_name) == 0) {
-            for (j = 0; j < num_unique_names - 1; j++) {
+            for (int j = 0; j < num_unique_names - 1; j++) {
                 strcat(samples[current_sample].value, unique_names[j]);
                 strcat(samples[current_sample].value, "=");
                 strcat(samples[current_sample].value, prev_values[j]);
@@ -148,7 +133,7 @@ void sync_reconstruct(int buffer_size,int argn){
         }
 
         //unique_names[j] = name, so prev_values[j]= the last value of that named object
-        for (j = 0; j < num_unique_names; j++) {
+        for (int j = 0; j < num_unique_names; j++) {
             if (strcmp(name, unique_names[j]) == 0) {
                 strcpy(prev_values[j],value);
                 break;
@@ -156,15 +141,12 @@ void sync_reconstruct(int buffer_size,int argn){
         }
 
     }
-    printf("curr %d\n",current_sample);
-    
-
     FILE *gnuplot_file = fopen("data.txt", "w");
     if (gnuplot_file == NULL) {
         perror("Error opening file");
         exit(1);
     }
-    for (i = 0; i < current_sample; i++) {
+    for (int i = 0; i < current_sample; i++) {
         printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
         char *token = strtok(samples[i].value, ",");
         int field_count = 1;
