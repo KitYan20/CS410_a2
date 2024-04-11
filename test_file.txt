@@ -14,8 +14,17 @@ expt=2,
 temperature=64 F,
 time=50 s,
 expt=3,
-temperature=70F,
-time=60 s
+temperature=70 F,
+time=60 s,
+expt=3,
+temperature=95 F,
+time=100 s,
+expt=3,
+temperature=99 F,
+time=170 s,
+expt=3,
+temperature=105 F,
+time=270 s,
 
 
 

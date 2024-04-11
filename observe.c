@@ -167,6 +167,7 @@ void async_observe(){
                 sem_wait(&four_slot_buffer->mutex);
                 strcpy(four_slot_buffer->data[four_slot_buffer->in],result);
                 four_slot_buffer->in = (four_slot_buffer->in + 1) % 4;
+                sleep(1);
                 sem_post(&four_slot_buffer->mutex);
                 sem_post(&four_slot_buffer->full_slots);
 
