@@ -54,17 +54,18 @@ void sync_observe(int buffer_size,int shm_id){
             char* name = input; //Get the name before "=" sign
             char* value = equals_sign + 1; //Get the value after the "=" sign
             // Find the first occurrence of newline character
-            value[strlen(value)-2] = ',';
+            //value[strlen(value)-1] = ',';
             char* newline = strchr(value, '\n');// Remove the newline from value
             if (newline != NULL) {
+                *newline++ = ',';
                 *newline = '\0';//End it with a null terminated character
             }
             strcpy(result,name);//copy the name into the results string
             strcat(result,"=");//concatenate the string with "="
             strcat(result,value);//concatenate the string after "=" with the value
+            value[strlen(value)] = ',';
             
-            
-            printf("%s\n",result);
+            //printf("%s\n",result);
             int existing_name_index = 0;//initialize this variable to check if duplicate names appeared more than once
             for (int i = 0 ; i < num_unique_names; i++){//Iterate through the list of name_value pairs in unique_names
                 if (strcmp(unique_names[i].name_value,result) == 0){//If the name_value already exist, we can break
