@@ -139,9 +139,9 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         }
 
     }
-    printf("Reconstruct Process\n");
-    printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
-    printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
+    // printf("Reconstruct Process\n");
+    // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
+    // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
     RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
     ring_buffer_2->in = 0;
     ring_buffer_2->out = 0;
@@ -153,30 +153,22 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     }
     int i = 0;
     //Producer
-    // strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
-    // //printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
-    while(i<current_sample){
-        while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out){
-            sleep(2);
-        };// Wait if the buffer is full
+    //strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+    //printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+    while(i < current_sample){
+         while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out){
+             sleep(2);
+         };// Wait if the buffer is full
     
-        strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
-        printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
-        i++;
-        ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
-        //sleep(1);
+         strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+         printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+         i++;
+         ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
+         //sleep(1);
+         
     }
-    // Signal the consumer that the producer is done
-    strcpy(ring_buffer_2->data[ring_buffer_2->in], "END_OF_PRODUCTION");
-    ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;
-    // for (int i = 0; i < current_sample; i++){
-        
-    //     strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
-    //     printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+    ring_buffer_2->done = 1;//Ring buffer is done processing
 
-    // }
-    strcpy(ring_buffer_2->data[ring_buffer_2->in], "");
-    // ring_buffer_2->done = 1;
     // FILE *gnuplot_file = fopen("data.txt", "w");
     // if (gnuplot_file == NULL) {
     //     perror("Error opening file");
@@ -208,8 +200,8 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         exit(1);
     }
     if (shmdt(ring_buffer_2) == -1) {
-    perror("shmdt");
-    exit(1);
+        perror("shmdt");
+        exit(1);
     }
 }
 
