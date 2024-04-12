@@ -46,6 +46,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
         perror("shmget meme");
         exit(1);
     }
+
     //Create a id for reconstruct and tapplot
     int shm_id_2 = shmget(IPC_PRIVATE,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
     //printf("ID 2 %d",shm_id_2);
@@ -72,30 +73,44 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
 
     //fork and execute observe process
     pid_t observe_pid = fork();
-    // printf("%d",observe_pid);
-    if (observe_pid == 0){
-        execl(programs[0].name,"observe",buff_size,optional_argument,"sync",shm_id_obs_rec,NULL);
+    if (observe_pid == 0) {
+        execl(programs[0].name, "observe", buff_size, optional_argument, "sync", shm_id_obs_rec, NULL);
         perror("execl");
         exit(EXIT_FAILURE);
-    }
+    } else if (observe_pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } 
+    
+    
 
     pid_t reconstruct_pid = fork();
-    if (reconstruct_pid == 0){
-        execl(programs[1].name,"reconstruct",buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap,NULL);
+    if (reconstruct_pid == 0) {
+        execl(programs[1].name, "reconstruct", buff_size, optional_argument, "sync", shm_id_obs_rec, shm_id_rec_tap, NULL);
         perror("execl");
         exit(EXIT_FAILURE);
-    }
+    } else if (reconstruct_pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } 
+    waitpid(observe_pid, NULL, 0); // Wait for observe to finish
+    waitpid(reconstruct_pid, NULL, 0); // Wait for reconstruct to finish
+    
 
     pid_t tapplot_pid = fork();
-    if (tapplot_pid == 0){
-        execl(programs[2].name,"tapplot",buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap,NULL);
+    if (tapplot_pid == 0) {
+        execl(programs[2].name, "tapplot", buff_size, optional_argument, "sync", shm_id_obs_rec, shm_id_rec_tap, NULL);
         perror("execl");
         exit(EXIT_FAILURE);
-    }
+    } else if (tapplot_pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } 
+    waitpid(tapplot_pid, NULL, 0); // Wait for tapplot to finish
+// Continue with the parent process code
+
     // // Wait for child processes to complete
-    waitpid(observe_pid ,NULL, 0);
-    waitpid(reconstruct_pid, NULL, 0);
-    waitpid(tapplot_pid, NULL, 0);
+    
     // for (int i = 0; i < num_programs ; i++){
     //     // pid_t pid = fork();
     //     pids[i] = fork();

@@ -7,7 +7,8 @@
 #include <sys/shm.h>
 #include <time.h>
 #include <semaphore.h>
-
+#include <fcntl.h>           /* For O_* constants */
+#include <sys/stat.h>        /* For mode constants */
 #define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
 #define MAX_SAMPLES 1064
@@ -38,8 +39,6 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         int in;
         int out;
         int done;
-        sem_t items;
-        sem_t spaces;
     } RingBuffer;
 
     /* Attach shared memory segment to shared_data */
@@ -140,46 +139,68 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         }
 
     }
+    printf("Reconstruct Process\n");
+    printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
+    printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
     RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
     ring_buffer_2->in = 0;
     ring_buffer_2->out = 0;
     ring_buffer_2->done = 0;
-    sem_init(&ring_buffer_2->items, 1, 0);
-    sem_init(&ring_buffer_2->spaces, 1, buffer_size); 
+
     if (ring_buffer_2 == (void*)-1){
         perror("shmat");
         exit(1);
     }
     int i = 0;
     //Producer
-
-
-   
-   
-    FILE *gnuplot_file = fopen("data.txt", "w");
-    if (gnuplot_file == NULL) {
-        perror("Error opening file");
-        exit(1);
+    // strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+    // //printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+    while(i<current_sample){
+        while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out){
+            sleep(2);
+        };// Wait if the buffer is full
+    
+        strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+        printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+        i++;
+        ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
+        //sleep(1);
     }
-    for (int i = 0; i < current_sample; i++) {
-        printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
-        char *token = strtok(samples[i].value, ",");
-        int field_count = 1;
-        while (token != NULL) {
-            if (field_count == argn) {
-                char *value = strchr(token, '=');
-                if (value != NULL) {
-                    value++;
-                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-                }
-                break;
-            }
-            token = strtok(NULL, ",");
-            field_count++;
-        }
+    // Signal the consumer that the producer is done
+    strcpy(ring_buffer_2->data[ring_buffer_2->in], "END_OF_PRODUCTION");
+    ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;
+    // for (int i = 0; i < current_sample; i++){
         
-    }
-    fclose(gnuplot_file);
+    //     strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+    //     printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+
+    // }
+    strcpy(ring_buffer_2->data[ring_buffer_2->in], "");
+    // ring_buffer_2->done = 1;
+    // FILE *gnuplot_file = fopen("data.txt", "w");
+    // if (gnuplot_file == NULL) {
+    //     perror("Error opening file");
+    //     exit(1);
+    // }
+    // for (int i = 0; i < current_sample; i++) {
+    //     printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+    //     char *token = strtok(samples[i].value, ",");
+    //     int field_count = 1;
+    //     while (token != NULL) {
+    //         if (field_count == argn) {
+    //             char *value = strchr(token, '=');
+    //             if (value != NULL) {
+    //                 value++;
+    //                 fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
+    //             }
+    //             break;
+    //         }
+    //         token = strtok(NULL, ",");
+    //         field_count++;
+    //     }
+        
+    // }
+    // fclose(gnuplot_file);
 
     //Detach shared memory segment
     if (shmdt(ring_buffer) == -1) {
