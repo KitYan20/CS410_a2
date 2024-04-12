@@ -8,21 +8,8 @@
 
 #define MAX_VALUE_SIZE 1064
 #define MAX_SAMPLES 1064
-typedef struct {
-    char data[10][MAX_VALUE_SIZE];
-    int in;
-    int out;
-    int done;
-} RingBuffer;
 
-int main(int argc, char *argv[]) {
-    
-    int buffer_size = atoi(argv[1]);
-    int argn = atoi(argv[2]);
-    char *buffer_option = argv[3];
-    int shm_id = atoi(argv[4]);
-    int shm_id_2 = atoi(argv[5]);
-
+void sync_plot(int buffer_size, int argn, int shm_id_2){
     // printf("Tapplot Process\n");
     // printf("Reconstruct to Tapplot Producer ID 2 %d\n", shm_id_2);
     typedef struct {
@@ -128,6 +115,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
+}
+int main(int argc, char *argv[]) {
+    int buffer_size = atoi(argv[1]);
+    int argn = atoi(argv[2]);
+    char *buffer_option = argv[3];
+    int shm_id = atoi(argv[4]);
+    int shm_id_2 = atoi(argv[5]);
+    if (strcmp(buffer_option,"sync") == 0){
+        sync_plot(buffer_size,argn,shm_id_2);
+    }
+
 
     return 0;
 }
