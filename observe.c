@@ -182,12 +182,11 @@ void async_observe(){
 }
 
 int main(int argc, char *argv[]) {
-    
-    printf("Buffer size %d\n",atoi(argv[1]));
+    //printf("Buffer size %d\n",atoi(argv[1]));
     int buffer_size = atoi(argv[1]);
     char *buffer_option = argv[3];
     int shm_id = atoi(argv[4]);
-    printf("Buffer option %s\n",buffer_option);
+    //printf("Buffer option %s\n",buffer_option);
     if (strcmp(buffer_option,"sync") == 0){
         sync_observe(buffer_size,shm_id);
     }else{
