@@ -25,7 +25,7 @@ typedef struct {
     char name_value[MAX_VALUE_LEN];
 } NameValue;
 
-void sync_observe(int buffer_size){
+void sync_observe(int buffer_size,int shm_id){
     typedef struct {
         char data[buffer_size][MAX_VALUE_SIZE];
         int in;
@@ -39,12 +39,6 @@ void sync_observe(int buffer_size){
     int num_unique_names = 0;//This will be our counter to count how many name_value pairs are stored 
     char result[256];//A result string to combine both the name and value of a input line
 
-    key_t shm_key = ftok(".",'R');
-    int shm_id = shmget(shm_key,sizeof(RingBuffer),0666);
-    if (shm_id < 0) {
-        perror("shmget");
-        exit(1);
-    }
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
 
@@ -52,7 +46,7 @@ void sync_observe(int buffer_size){
         perror("shmat");
         exit(1);
     }
-
+    
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
         if (equals_sign != NULL) {
@@ -80,14 +74,14 @@ void sync_observe(int buffer_size){
                 num_unique_names++;//Increment to move on to the next position
 
                 //printf("%s\n",ring_buffer->data[ring_buffer->write_index]);
-                while((ring_buffer->in + 1) % BUFFER_SIZE == ring_buffer->out){
+                while((ring_buffer->in + 1) % buffer_size == ring_buffer->out){
                     // Buffer is full, wait for space to become available
                     sleep(1);
                 };
                 //Write the observe change to ring buffer
                 strcpy(ring_buffer->data[ring_buffer->in],result);
                 //printf("Producer produces %s\n",ring_buffer->data[ring_buffer->in]);
-                ring_buffer->in = (ring_buffer->in + 1) % BUFFER_SIZE;//Move on to the next slot in the buffer using modulo
+                ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
 
                 //sleep(1);
                 
@@ -167,6 +161,7 @@ void async_observe(){
                 sem_wait(&four_slot_buffer->mutex);
                 strcpy(four_slot_buffer->data[four_slot_buffer->in],result);
                 four_slot_buffer->in = (four_slot_buffer->in + 1) % 4;
+                sleep(1);
                 sem_post(&four_slot_buffer->mutex);
                 sem_post(&four_slot_buffer->full_slots);
 
@@ -191,9 +186,10 @@ int main(int argc, char *argv[]) {
     printf("Buffer size %d\n",atoi(argv[1]));
     int buffer_size = atoi(argv[1]);
     char *buffer_option = argv[3];
+    int shm_id = atoi(argv[4]);
     printf("Buffer option %s\n",buffer_option);
     if (strcmp(buffer_option,"sync") == 0){
-        sync_observe(buffer_size);
+        sync_observe(buffer_size,shm_id);
     }else{
         async_observe();
     }

@@ -36,44 +36,40 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
             int done;
     }RingBuffer;
 
-    key_t shm_key = ftok(".",'R');
-    
-    int shm_id = shmget(shm_key,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
+    // key_t shm_key = ftok(".",'R');
+    //Create a id for observe and reconstruct
+    int shm_id = shmget(IPC_PRIVATE,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
+    //printf("ID 1 %d",shm_id);
     // Create shared memory segment
     if (shm_id < 0) {
         perror("shmget meme");
         exit(1);
     }
-    /* Attach shared memory segment to shared_data */    
-    RingBuffer *ring_buffer;
-    ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
-    // printf("shm id %d\n",shm_id);
-    // printf("ring buffer address 0x%x\n",ring_buffer);
-
-    if (ring_buffer == (void*)-1){//Memory address of the shared memory segment
-        perror("shmat");
+    //Create a id for reconstruct and tapplot
+    int shm_id_2 = shmget(IPC_PRIVATE,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
+    //printf("ID 2 %d",shm_id_2);
+    // Create shared memory segment
+    if (shm_id_2 < 0) {
+        perror("shmget meme");
         exit(1);
     }
-    //Initialize the ring buffer
-    ring_buffer->in = 0;
-    ring_buffer->out = 0;
-    ring_buffer->done = 0;
-
     pid_t pids[MAX_PROGRAMS];
-
     char optional_argument[256];
     char buff_size[256];
     snprintf(optional_argument,sizeof(optional_argument),"%d",optional);
     snprintf(buff_size,sizeof(buff_size),"%d",buffer_size);
     char buff_option[10] = "sync";
+    char shm_id_obs_rec[20];
+    char shm_id_rec_tap[20];
+    snprintf(shm_id_obs_rec, sizeof(shm_id_obs_rec), "%d", shm_id);
+    snprintf(shm_id_rec_tap, sizeof(shm_id_rec_tap), "%d", shm_id_2);
+
     //Fork and execute observe and reconstruct processes
     for (int i = 0; i < num_programs ; i++){
         // pid_t pid = fork();
         pids[i] = fork();
-        
         if (pids[i] == 0){ //child process
-    
-            execl(programs[i].name, programs[i].name,buff_size,optional_argument,"sync", NULL);
+            execl(programs[i].name, programs[i].name,buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap, NULL);
             perror("execl");
             exit(EXIT_FAILURE);
         }else if (pids[i] < 0){
@@ -86,13 +82,17 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
         waitpid(pids[i], NULL, 0);
     }
     //Detach shared memory segment
-    if (shmdt(ring_buffer) == -1) {
-        perror("shmdt");
-        exit(1);
-    }
+    // if (shmdt(ring_buffer) == -1) {
+    //     perror("shmdt");
+    //     exit(1);
+    // }
 
     // Delete shared memory segment
     if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+        exit(1);
+    }
+    if (shmctl(shm_id_2, IPC_RMID, NULL) == -1) {
         perror("shmctl");
         exit(1);
     }
