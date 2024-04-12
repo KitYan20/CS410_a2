@@ -1,0 +1,1 @@
+make TAPPER;./tapper -p1 ./observe -p2 ./reconstruct -b sync -s 10 < test_file.txt;make clean_tapper

@@ -1,1 +1,8 @@
-cat: helo: No such file or directory
+Buffer size 10
+Buffer option sync
+2
+sample number 1, expt=1, temperature=60 F, time=10 s
+sample number 2, expt=1, temperature=60 F, time=20 s
+sample number 3, expt=1, temperature=61 F, time=30 s
+sample number 4, expt=2, temperature=64 F, time=40 s
+sample number 5, expt=2, temperature=64 F, time=50 s

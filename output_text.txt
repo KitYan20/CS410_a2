@@ -1,1 +1,0 @@
-expt=1, temperature=60 F, time=10 s, time=20 s, temperature=61 F, time=30 s, expt=2, temperature=64 F, time=40 s, time=50 s 
