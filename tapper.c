@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -53,7 +54,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
         perror("shmget meme");
         exit(1);
     }
-    pid_t pids[MAX_PROGRAMS];
+    // pid_t pids[MAX_PROGRAMS];
     char optional_argument[256];
     char buff_size[256];
     snprintf(optional_argument,sizeof(optional_argument),"%d",optional);
@@ -65,22 +66,52 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     snprintf(shm_id_rec_tap, sizeof(shm_id_rec_tap), "%d", shm_id_2);
 
     //Fork and execute observe and reconstruct processes
-    for (int i = 0; i < num_programs ; i++){
-        // pid_t pid = fork();
-        pids[i] = fork();
-        if (pids[i] == 0){ //child process
-            execl(programs[i].name, programs[i].name,buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap, NULL);
-            perror("execl");
-            exit(EXIT_FAILURE);
-        }else if (pids[i] < 0){
-            fprintf(stderr, "Error forking");
-            exit(EXIT_FAILURE);
-        }
+    // printf("%s",programs[0].name);//observe process
+    // printf("%s",programs[1].name);//reconstruct process
+    // printf("%s",programs[2].name);//tapplot process
+
+    //fork and execute observe process
+    pid_t observe_pid = fork();
+    // printf("%d",observe_pid);
+    if (observe_pid == 0){
+        execl(programs[0].name,"observe",buff_size,optional_argument,"sync",shm_id_obs_rec,NULL);
+        perror("execl");
+        exit(EXIT_FAILURE);
     }
+
+    pid_t reconstruct_pid = fork();
+    if (reconstruct_pid == 0){
+        execl(programs[1].name,"reconstruct",buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap,NULL);
+        perror("execl");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t tapplot_pid = fork();
+    if (tapplot_pid == 0){
+        execl(programs[2].name,"tapplot",buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap,NULL);
+        perror("execl");
+        exit(EXIT_FAILURE);
+    }
+    // // Wait for child processes to complete
+    waitpid(observe_pid ,NULL, 0);
+    waitpid(reconstruct_pid, NULL, 0);
+    waitpid(tapplot_pid, NULL, 0);
+    // for (int i = 0; i < num_programs ; i++){
+    //     // pid_t pid = fork();
+    //     pids[i] = fork();
+    //     if (pids[i] == 0){ //child process
+    //         execl(programs[i].name, programs[i].name,buff_size,optional_argument,"sync",shm_id_obs_rec,shm_id_rec_tap, NULL);
+    //         perror("execl");
+    //         exit(EXIT_FAILURE);
+    //     }else if (pids[i] < 0){
+    //         fprintf(stderr, "Error forking");
+    //         exit(EXIT_FAILURE);
+    //     }
+    // }
     // Wait for child processes to complete
-    for (int i = 0 ; i < num_programs ; i++){
-        waitpid(pids[i], NULL, 0);
-    }
+    // for (int i = 0 ; i < num_programs ; i++){
+    //     waitpid(pids[i], NULL, 0);
+    // }
     //Detach shared memory segment
     // if (shmdt(ring_buffer) == -1) {
     //     perror("shmdt");
