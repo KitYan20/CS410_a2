@@ -190,7 +190,8 @@ int main(int argc, char *argv[]) {
         //printf("Observe Id %d\n",shm_id);
         sync_observe(buffer_size,shm_id);
     }else{
-        async_observe();
+        printf("%s\n",buffer_option);
+        //async_observe();
     }
     return 0;
 }

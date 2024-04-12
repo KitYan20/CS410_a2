@@ -357,7 +357,9 @@ int main(int argc, char *argv[]){
     if (strcmp(buffer_option,"sync") == 0){
         sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
     }else{
-        async_reconstruct();
+        printf("%s\n",buffer_option);
+
+        //async_reconstruct();
     }
     return 0;
 }
