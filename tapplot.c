@@ -41,7 +41,7 @@ void sync_plot(int buffer_size, int argn, int shm_id_2){
             break;
         }
 
-        //printf("Consumer 2 consumes %s\n", ring_buffer->data[ring_buffer->out]);
+        printf("Consumer 2 consumes %s\n", ring_buffer->data[ring_buffer->out]);
         strcpy(samples[num_samples], ring_buffer->data[ring_buffer->out]);
         num_samples++;
         
