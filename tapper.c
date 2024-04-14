@@ -22,7 +22,15 @@ typedef struct {
     char *name;
     int optional;
 } Programs;
-
+typedef struct {
+    char data[4][MAX_VALUE_SIZE];
+    int in;
+    int out;
+    sem_t mutex;
+    sem_t empty_slots;
+    sem_t full_slots;
+    int done;
+} Four_Slot_Buffer;
 // typedef struct {
 //     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
 //     int in;
@@ -144,47 +152,36 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     }
 }
 
-void asynchronous_shared_memory(int num_programs, Programs programs[], int buffer_size, int optional){
-    typedef struct {
-        char data[4][MAX_VALUE_SIZE];
-        int in;
-        int out;
-        sem_t mutex;
-        sem_t empty_slots;
-        sem_t full_slots;
-        int done;
-    } Four_Slot_Buffer;
-
-    
+void asynchronous_shared_memory(int num_programs, Programs programs[], int buffer_size, int optional){    
     int shm_id = shmget(IPC_PRIVATE,sizeof(Four_Slot_Buffer), IPC_CREAT | 0666);//Shared Memory ID
     // Create shared memory segment
     if (shm_id < 0) {
         perror("shmget meme");
         exit(1);
     }
-    // Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*)shmat(shm_id,NULL,0);
-    // if (four_slot_buffer == (void*)-1){
-    //     perror("shmat");
-    //     exit(1);
-    // }
+    Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*)shmat(shm_id,NULL,0);
+    if (four_slot_buffer == (void*)-1){
+        perror("shmat");
+        exit(1);
+    }
 
     // //initialize four-slot buffer
-    // four_slot_buffer->in = 0;
-    // four_slot_buffer->out = 0;
-    // four_slot_buffer->done = 0;
-    // //Initialize the sempahores with sem_init
-    // sem_init(&four_slot_buffer->mutex,1,1);
-    // sem_init(&four_slot_buffer->empty_slots,1,4);
-    // sem_init(&four_slot_buffer->full_slots,1,0);
+    four_slot_buffer->in = 0;
+    four_slot_buffer->out = 0;
+    four_slot_buffer->done = 0;
+    //Initialize the sempahores with sem_init
+    sem_init(&four_slot_buffer->mutex,1,1);
+    sem_init(&four_slot_buffer->empty_slots,1,4);
+    sem_init(&four_slot_buffer->full_slots,1,0);
 
     //Create a id for reconstruct and tapplot
     int shm_id_2 = shmget(IPC_PRIVATE,sizeof(Four_Slot_Buffer), IPC_CREAT | 0666);//Shared Memory ID
-    //printf("ID 2 %d",shm_id_2);
-    // Create shared memory segment
-    if (shm_id_2 < 0) {
-        perror("shmget meme");
-        exit(1);
-    }
+    // //printf("ID 2 %d",shm_id_2);
+    // // Create shared memory segment
+    // if (shm_id_2 < 0) {
+    //     perror("shmget meme");
+    //     exit(1);
+    // }
     // pid_t pids[MAX_PROGRAMS];
     char optional_argument[256];
     char buff_size[256];
@@ -213,7 +210,6 @@ void asynchronous_shared_memory(int num_programs, Programs programs[], int buffe
     } 
     
     
-
     pid_t reconstruct_pid = fork();
     if (reconstruct_pid == 0) {
         execl(programs[1].name, "reconstruct", buff_size, optional_argument, "async", shm_id_obs_rec, shm_id_rec_tap, NULL);

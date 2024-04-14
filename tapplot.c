@@ -1,13 +1,27 @@
-// tapplot.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <time.h>
+#include <semaphore.h>
+#include <fcntl.h>           /* For O_* constants */
+#include <sys/stat.h>        /* For mode constants */
 
 #define MAX_VALUE_SIZE 1064
-#define MAX_SAMPLES 1064
+#define MAX_SAMPLES 2128
+
+typedef struct {
+    char data[4][MAX_VALUE_SIZE];
+    int in;
+    int out;
+    sem_t mutex;
+    sem_t empty_slots;
+    sem_t full_slots;
+    int done;
+} Four_Slot_Buffer;
 
 void sync_plot(int buffer_size, int argn, int shm_id_2){
     // printf("Tapplot Process\n");
@@ -75,22 +89,22 @@ void sync_plot(int buffer_size, int argn, int shm_id_2){
         char *sample = samples[i];
         char *token = strtok(sample, ",");
         int field_count = 1;
-        double value = 0.0;
+        int value = 0;
 
         while (token != NULL) {
             if (field_count == argn) {
                 char *value_str = strchr(token, '=');
                 if (value_str != NULL) {
                     value_str++;  // Skip '='
-                    value = atof(value_str);
+                    value = atoi(value_str);
                     break;
                 }
             }
             token = strtok(NULL, ",");
             field_count++;
         }
-
-        fprintf(temp_file, "%d %f\n", i + 1, value);
+        //printf("%d\n", (int)value);
+        fprintf(temp_file, "%d %d\n", i + 1, value);
     }
 
     rewind(temp_file);
@@ -116,6 +130,26 @@ void sync_plot(int buffer_size, int argn, int shm_id_2){
     }
     
 }
+void async_plot(int argn, int shm_id_2){
+    Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*)shmat(shm_id_2, NULL, 0);
+    int num_samples = 0;
+    char samples[MAX_SAMPLES][MAX_VALUE_SIZE];
+    if (four_slot_buffer == (void*)-1) {
+        perror("shmat");
+        exit(1);
+    }
+    printf("Hello\n");
+    
+
+    // Destroy the semaphores
+    sem_destroy(&four_slot_buffer->mutex);
+    sem_destroy(&four_slot_buffer->empty_slots);
+    sem_destroy(&four_slot_buffer->full_slots);
+    if (shmdt(four_slot_buffer) == -1) {
+    perror("shmdt");
+    exit(1);
+    }
+}
 int main(int argc, char *argv[]) {
     int buffer_size = atoi(argv[1]);
     int argn = atoi(argv[2]);
@@ -124,6 +158,8 @@ int main(int argc, char *argv[]) {
     int shm_id_2 = atoi(argv[5]);
     if (strcmp(buffer_option,"sync") == 0){
         sync_plot(buffer_size,argn,shm_id_2);
+    }else{
+        async_plot(argn,shm_id_2);
     }
 
 

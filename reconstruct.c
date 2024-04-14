@@ -9,9 +9,10 @@
 #include <semaphore.h>
 #include <fcntl.h>           /* For O_* constants */
 #include <sys/stat.h>        /* For mode constants */
+
 #define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
-#define MAX_SAMPLES 1064
+#define MAX_SAMPLES 2128
 #define MAX_NAMES 256
 
 // typedef struct {
@@ -24,7 +25,15 @@ typedef struct {
     int sample_number;
     char value[MAX_NAMES];
 } Sample;
-
+typedef struct {
+    char data[4][MAX_VALUE_SIZE];
+    int in;
+    int out;
+    sem_t mutex;
+    sem_t empty_slots;
+    sem_t full_slots;
+    int done;
+} Four_Slot_Buffer;
 
 void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
@@ -205,7 +214,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     }
 }
 
-void async_reconstruct(){
+void async_reconstruct(int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
     char *input_samples[MAX_SAMPLES];
     char *meme[MAX_SAMPLES];
@@ -214,22 +223,7 @@ void async_reconstruct(){
     int num_unique_names = 0;
     char end_name[MAX_NAMES];
     int current_sample = 0;
-    int i, j;
-    typedef struct {
-        char data[4][MAX_VALUE_SIZE];
-        int in;
-        int out;
-        sem_t mutex;
-        sem_t empty_slots;
-        sem_t full_slots;
-        int done;
-    } Four_Slot_Buffer;
-    key_t shm_key = ftok(".",'R');
-    int shm_id = shmget(shm_key,sizeof(Four_Slot_Buffer),0666);
-    if (shm_id < 0) {
-        perror("shmget");
-        exit(1);
-    }
+
     /* Attach shared memory segment to shared_data */
     Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*) shmat(shm_id,NULL,0);
 
@@ -237,36 +231,40 @@ void async_reconstruct(){
         perror("shmat");
         exit(1);
     }
-    while(!four_slot_buffer->done){
-        sem_wait(&four_slot_buffer->full_slots);
-        sem_wait(&four_slot_buffer->mutex);
-        if (four_slot_buffer->done){
-            printf("Consumer produce %s\n", four_slot_buffer->data[four_slot_buffer->out]);
+    struct timespec timeout;
+    while(1){
+        clock_gettime(CLOCK_REALTIME, &timeout);
+        timeout.tv_sec += 1; // Set timeout to 1 second from now
+        if (sem_timedwait(&four_slot_buffer->full_slots, &timeout) == 0) {
+            sem_wait(&four_slot_buffer->mutex);
+
+            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {
+                sem_post(&four_slot_buffer->mutex);
+                sem_post(&four_slot_buffer->empty_slots);
+                break;
+            }
+            char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
+            //printf("Consumer consumes [%d] %s\n",num_inputs,result);
+            meme[num_inputs] = result;
+            num_inputs++;
+            //usleep(10000);
+            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
             sem_post(&four_slot_buffer->mutex);
             sem_post(&four_slot_buffer->empty_slots);
-            break;
 
+        } else {
+            // Semaphore not available within the timeout, continue execution
+            continue;
         }
-        printf("Consumer produce %s\n", four_slot_buffer->data[four_slot_buffer->out]);
-        meme[num_inputs] = four_slot_buffer->data[four_slot_buffer->out];
-        //input_samples[num_inputs] = ring_buffer->data[ring_buffer->out];
-        // printf("%s\n",meme[num_inputs]);
-        // printf("%d\n",num_inputs);
-        num_inputs++;
-        four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
-        sleep(2);
-        sem_post(&four_slot_buffer->mutex);
-        sem_post(&four_slot_buffer->empty_slots);
-
-
-        
     }
+    // Destroy the semaphores
+    sem_destroy(&four_slot_buffer->mutex);
+    sem_destroy(&four_slot_buffer->empty_slots);
+    sem_destroy(&four_slot_buffer->full_slots);
+    // for (int i = 0;i<num_inputs;i++){
+    //     printf("Consumer consumes [%d] %s\n",i,meme[i]);
+    // }
 
-    printf("Done \n");
-    for (i = 0; i < num_inputs; i++){
-        printf("%s\n",meme[i]);
-    }
-    printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(meme[i],',');
         if (comma != NULL){
@@ -280,7 +278,7 @@ void async_reconstruct(){
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
 
-        for (j = 0; j < num_unique_names; j++) {
+        for (int j = 0; j < num_unique_names; j++) {
             if (strcmp(unique_names[j], name) == 0) {
                 is_new_name = 0;
                 break;
@@ -299,7 +297,7 @@ void async_reconstruct(){
         
     }
     char prev_values[MAX_NAMES][MAX_NAMES] = {0};
-    printf("%d\n",num_unique_names);
+    // printf("%d\n",num_unique_names);
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
         char *token = meme[i];
@@ -308,7 +306,7 @@ void async_reconstruct(){
         // now we have name and value
         // if this sample's name is the end name, wrap up this sample 
         if (strcmp(name, end_name) == 0) {
-            for (j = 0; j < num_unique_names - 1; j++) {
+            for (int j = 0; j < num_unique_names - 1; j++) {
                 strcat(samples[current_sample].value, unique_names[j]);
                 strcat(samples[current_sample].value, "=");
                 strcat(samples[current_sample].value, prev_values[j]);
@@ -326,7 +324,7 @@ void async_reconstruct(){
         }
 
         //unique_names[j] = name, so prev_values[j]= the last value of that named object
-        for (j = 0; j < num_unique_names; j++) {
+        for (int j = 0; j < num_unique_names; j++) {
             if (strcmp(name, unique_names[j]) == 0) {
                 strcpy(prev_values[j],value);
                 break;
@@ -334,15 +332,64 @@ void async_reconstruct(){
         }
 
     }
-    //printf("curr %d\n",current_sample);
-    for (i = 0; i < current_sample; i++) {
-        printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+    for (int i = 0; i < current_sample ;i++){
+        printf("Consumer produced %s\n",samples[i].value);
     }
+    // printf("Reconstruct Process\n");
+    // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
+    // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
+    Four_Slot_Buffer *four_slot_buffer_2 = (Four_Slot_Buffer*) shmat(shm_id_2,NULL,0);
+
+    if (four_slot_buffer_2 == (void*)-1){
+        perror("shmat");
+        exit(1);
+    }
+    //intialize second four slot buffer
+    four_slot_buffer_2->in = 0;
+    four_slot_buffer_2->out = 0;
+    four_slot_buffer_2->done = 0;
+    // //Initialize the sempahores with sem_init
+    sem_init(&four_slot_buffer_2->mutex,1,1);
+    sem_init(&four_slot_buffer_2->empty_slots,1,4);
+    sem_init(&four_slot_buffer_2->full_slots,1,0);
+    int i = 0;
+    // clock_gettime(CLOCK_REALTIME,&timeout);
+    // timeout.tv_sec += 1;
+    //Producer
+    // while (i < current_sample) {
+    //     clock_gettime(CLOCK_REALTIME,&timeout);
+    //     timeout.tv_sec += 1;
+    //     if (sem_timedwait(&four_slot_buffer_2->empty_slots,&timeout) == 0){
+    //         sem_wait(&four_slot_buffer_2->mutex);
+    //         strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
+    //         printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
+    //         four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
+    //         sem_post(&four_slot_buffer_2->mutex);
+    //         sem_post(&four_slot_buffer_2->full_slots);
+            
+    //     }else{
+    //         continue;
+    //     }
+    //     i++;
+    // }
+    four_slot_buffer_2->done = 1;
+    sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
+
+    sem_destroy(&four_slot_buffer_2->mutex);
+    sem_destroy(&four_slot_buffer_2->empty_slots);
+    sem_destroy(&four_slot_buffer_2->full_slots);
+
+    //printf("Done\n");
     //Detach shared memory segment
     if (shmdt(four_slot_buffer) == -1) {
         perror("shmdt");
         exit(1);
     }
+    if (shmdt(four_slot_buffer_2) == -1) {
+        perror("shmdt");
+        exit(1);
+    }
+    
     
 }
 
@@ -357,9 +404,8 @@ int main(int argc, char *argv[]){
     if (strcmp(buffer_option,"sync") == 0){
         sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
     }else{
-        printf("%s\n",buffer_option);
-
-        //async_reconstruct();
+        printf("Reconstruct %s\n",buffer_option);
+        async_reconstruct(shm_id,shm_id_2);
     }
     return 0;
 }
