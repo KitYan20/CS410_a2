@@ -61,6 +61,7 @@ void sync_observe(int buffer_size,int shm_id){
     }
     
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
+        
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
         if (equals_sign != NULL) {
             *equals_sign = '\0';  // Null-terminate the value
@@ -144,7 +145,7 @@ void async_observe(int shm_id) {
     char end_name[MAX_VALUE_LEN] = "";
     char prev_values[MAX_NAMES][MAX_VALUE_LEN] = {0};
 
-    struct timespec timeout;//Create a timespec timeout structure
+    //struct timespec timeout;//Create a timespec timeout structure
 
     while (fgets(input, sizeof(input), stdin) != NULL) {//Read each line in a file
         char* equals_sign = strchr(input, '=');
@@ -176,10 +177,10 @@ void async_observe(int shm_id) {
             if (strcmp(prev_values[existing_name_index], value) != 0) {
                 //Main code to produce the required samples
                 strcpy(prev_values[existing_name_index], value);
-                clock_gettime(CLOCK_REALTIME, &timeout);// Get the current time and store it in the 'timeout' structure
-                timeout.tv_sec += 1; // Set timeout to 1 second from the current time
+                //clock_gettime(CLOCK_REALTIME, &timeout);// Get the current time and store it in the 'timeout' structure
+                //timeout.tv_sec += 1; // Set timeout to 1 second from the current time
                 //It will attempt to acquire the 'empty_slots' semaphore within the specified timeout
-                if (sem_timedwait(&four_slot_buffer->empty_slots, &timeout) == 0) {
+                if (sem_trywait(&four_slot_buffer->empty_slots) == 0) {
                     sem_wait(&four_slot_buffer->mutex);//acquire a mutex lock to allow for write access to shared buffer
                     //Use sprintf to store the name-value pair in a specified format in a slot specified by "in" indice
                     sprintf(four_slot_buffer->data[four_slot_buffer->in], "%s=%s", name, value);
@@ -190,7 +191,17 @@ void async_observe(int shm_id) {
                     //sleep(1);
                 } else {
                     // Semaphore not available within the timeout, continue execution
-                    continue;
+                    sem_wait(&four_slot_buffer->mutex);
+                    if (four_slot_buffer->done){
+                        sem_post(&four_slot_buffer->mutex);
+                        break;
+                    }
+                    sem_post(&four_slot_buffer->mutex);
+                    // Wait for a short duration using nano sleep before trying again
+                    struct timespec wait_time;
+                    wait_time.tv_sec = 0;
+                    wait_time.tv_nsec = 10000000; // 10 milliseconds
+                    nanosleep(&wait_time, NULL);
                 }
             }
         }

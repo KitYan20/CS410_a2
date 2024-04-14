@@ -228,44 +228,61 @@ void async_reconstruct(int shm_id,int shm_id_2){
         perror("shmat");
         exit(1);
     }
-    struct timespec timeout;
-    //Consumer
-    while(1){
-        clock_gettime(CLOCK_REALTIME, &timeout);
-        timeout.tv_sec += 1; // Set timeout to 1 second from now
-        //It will attempt to acquire the 'full_slots' semaphore within the specified timeout meaning there is data to consume
-        if (sem_timedwait(&four_slot_buffer->full_slots, &timeout) == 0) {
-            //Attempting to acquire a mutex semaphore 
-            //If acquired, it'll gain exclusive access to the shared buffer.
-            sem_wait(&four_slot_buffer->mutex); 
-            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {//break out of the consumer once it has finished processed all the samples
-                sem_post(&four_slot_buffer->mutex);//Release all the semaphores 
+    // Consumer
+    while (1) {
+        //sem_trywait attempts to acquire the semaphore immediately and returns if it is not available
+        //If sem_trywait successfully acquires the empty_slots semaphore, the code proceeds as before, 
+        //writing the name-value pair to the shared buffer.
+        // Attempt to acquire the 'full_slots' semaphore using sem_trywait
+        if (sem_trywait(&four_slot_buffer->full_slots) == 0) {
+            // If the semaphore is acquired successfully
+            // Attempting to acquire a mutex semaphore
+            // If acquired, it'll gain exclusive access to the shared buffer
+            sem_wait(&four_slot_buffer->mutex);
+            // Check if the producer is done and the buffer is empty
+            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {
+                // Release all the semaphores
+                sem_post(&four_slot_buffer->mutex);
                 sem_post(&four_slot_buffer->empty_slots);
                 break;
             }
+            // Copy the sample it reads into our reconstructed samples array
             char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
-            //Copy the sample it reads into our reconstructed samples array
-            //strcpy(reconstructed_samples[num_inputs],result);
-            //printf("Consumer consumes [%d] %s\n",num_inputs,result);
             reconstructed_samples[num_inputs] = result;
             num_inputs++;
-            //usleep(10000);
-            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;//Increment the pointer to to point to the next slot to read a sample
-            sem_post(&four_slot_buffer->mutex);// Release the mutex semaphore to allow other processes to access the shared buffer
-            sem_post(&four_slot_buffer->empty_slots);//Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
+            // Increment the pointer to point to the next slot to read a sample
+            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
+            // Release the mutex semaphore to allow other processes to access the shared buffer
+            sem_post(&four_slot_buffer->mutex);
+            // Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
+            sem_post(&four_slot_buffer->empty_slots);
+        //If sem_trywait fails to acquire the semaphore (i.e., returns a non-zero value), 
+        //it means that there are no empty slots available in the buffer. 
+        //In this case, the code checks if the consumer is done by acquiring the mutex semaphore and checking the done flag. 
+        //If the consumer is done, the code releases the mutex semaphore and breaks out of the loop.
+        // If the consumer is not done, the code releases the mutex semaphore and waits for a short duration (10 milliseconds) using nanosleep before trying again.   
         } else {
-            // Semaphore not available within the timeout, continue execution
-            continue;
+            // Semaphore not available, check if the producer is done
+            sem_wait(&four_slot_buffer->mutex);
+            if (four_slot_buffer->done) {
+                sem_post(&four_slot_buffer->mutex);
+                break;
+            }
+            sem_post(&four_slot_buffer->mutex);//Release the mutex semaphore to allow other processes to access shared buffer
+
+            // Wait for a short duration using nanosleep before trying again
+            struct timespec wait_time;
+            wait_time.tv_sec = 0;
+            wait_time.tv_nsec = 10000000; // 10 milliseconds
+            nanosleep(&wait_time, NULL);
         }
     }
-    // Destroy the semaphores
-    sem_destroy(&four_slot_buffer->mutex);
-    sem_destroy(&four_slot_buffer->empty_slots);
-    sem_destroy(&four_slot_buffer->full_slots);
     // for (int i = 0;i<num_inputs;i++){
     //     printf("Consumer consumes [%d] %s %ld\n",i,reconstructed_samples[i],strlen(reconstructed_samples[i]));
     // }
-   
+    sem_destroy(&four_slot_buffer->mutex);
+    sem_destroy(&four_slot_buffer->empty_slots);
+    sem_destroy(&four_slot_buffer->full_slots);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(reconstructed_samples[i],',');
         if (comma != NULL){
@@ -333,7 +350,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
         }
 
     }
-    //strcat(samples[current_sample-1].value," s"); <--- ONLY FOR cs410-test-file
+    strcat(samples[current_sample-1].value," s"); //<--- ONLY FOR cs410-test-file
     for (int i = 0; i < current_sample ;i++){
         printf("Consumer produced %s\n",samples[i].value);
     }
@@ -358,31 +375,42 @@ void async_reconstruct(int shm_id,int shm_id_2){
     sem_init(&four_slot_buffer_2->empty_slots,1,4);
     sem_init(&four_slot_buffer_2->full_slots,1,0);
     int i = 0;
-    // clock_gettime(CLOCK_REALTIME,&timeout);
-    // timeout.tv_sec += 1;
+    //clock_gettime(CLOCK_REALTIME,&timeout);
+    //timeout.tv_sec += 1;
     //Producer <- FIXING IT
-    // while (i < current_sample) {
-    //     clock_gettime(CLOCK_REALTIME,&timeout);
-    //     timeout.tv_sec += 1;
-    //     if (sem_timedwait(&four_slot_buffer_2->empty_slots,&timeout) == 0){
-    //         sem_wait(&four_slot_buffer_2->mutex);
-    //         strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
-    //         printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
-    //         four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
-    //         sem_post(&four_slot_buffer_2->mutex);
-    //         sem_post(&four_slot_buffer_2->full_slots);
+    while (i < current_sample) {
+        // clock_gettime(CLOCK_REALTIME,&timeout);
+        // timeout.tv_sec += 1;
+        if (sem_trywait(&four_slot_buffer_2->empty_slots) == 0){
+            sem_wait(&four_slot_buffer_2->mutex);
+            strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
+            printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
+            four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
+            sem_post(&four_slot_buffer_2->mutex);
+            sem_post(&four_slot_buffer_2->full_slots);
             
-    //     }else{
-    //         continue;
-    //     }
-    //     i++;
-    // }
-    // four_slot_buffer_2->done = 1;
-    // sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
+        }else{
+            // Semaphore not available within the timeout, continue execution
+            sem_wait(&four_slot_buffer_2->mutex);
+            if (four_slot_buffer_2->done){
+                sem_post(&four_slot_buffer_2->mutex);
+                break;
+            }
+            sem_post(&four_slot_buffer_2->mutex);
+            // Wait for a short duration using nano sleep before trying again
+            struct timespec wait_time;
+            wait_time.tv_sec = 0;
+            wait_time.tv_nsec = 20000000; // 10 milliseconds
+            nanosleep(&wait_time, NULL);
+        }
+        i++;
+    }
+    four_slot_buffer_2->done = 1;
+    sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
 
-    sem_destroy(&four_slot_buffer_2->mutex);
-    sem_destroy(&four_slot_buffer_2->empty_slots);
-    sem_destroy(&four_slot_buffer_2->full_slots);
+    // sem_destroy(&four_slot_buffer_2->mutex);
+    // sem_destroy(&four_slot_buffer_2->empty_slots);
+    // sem_destroy(&four_slot_buffer_2->full_slots);
 
     //printf("Done\n");
     //Detach shared memory segment
