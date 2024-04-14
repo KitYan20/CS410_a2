@@ -214,13 +214,13 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
 
 void async_reconstruct(int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
-    char reconstructed_samples[MAX_SAMPLES][MAX_SAMPLES];
+    char *reconstructed_samples[MAX_SAMPLES];
     int num_inputs = 0;
     char unique_names[MAX_NAMES][MAX_NAMES];
     int num_unique_names = 0;
     char end_name[MAX_NAMES];
     int current_sample = 0;
-
+    // char result[256];
     /* Attach shared memory segment to shared_data */
     Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*) shmat(shm_id,NULL,0);
 
@@ -238,14 +238,16 @@ void async_reconstruct(int shm_id,int shm_id_2){
             //Attempting to acquire a mutex semaphore 
             //If acquired, it'll gain exclusive access to the shared buffer.
             sem_wait(&four_slot_buffer->mutex); 
-            if (four_slot_buffer->done) {//break out of the consumer once it has finished processed all the samples
+            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {//break out of the consumer once it has finished processed all the samples
                 sem_post(&four_slot_buffer->mutex);//Release all the semaphores 
                 sem_post(&four_slot_buffer->empty_slots);
                 break;
             }
+            char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
             //Copy the sample it reads into our reconstructed samples array
-            strcpy(reconstructed_samples[num_inputs],four_slot_buffer->data[four_slot_buffer->out]);
+            //strcpy(reconstructed_samples[num_inputs],result);
             //printf("Consumer consumes [%d] %s\n",num_inputs,result);
+            reconstructed_samples[num_inputs] = result;
             num_inputs++;
             //usleep(10000);
             four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;//Increment the pointer to to point to the next slot to read a sample
@@ -261,9 +263,9 @@ void async_reconstruct(int shm_id,int shm_id_2){
     sem_destroy(&four_slot_buffer->empty_slots);
     sem_destroy(&four_slot_buffer->full_slots);
     // for (int i = 0;i<num_inputs;i++){
-    //     printf("Consumer consumes [%d] %s\n",i,meme[i]);
+    //     printf("Consumer consumes [%d] %s %ld\n",i,reconstructed_samples[i],strlen(reconstructed_samples[i]));
     // }
-
+   
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(reconstructed_samples[i],',');
         if (comma != NULL){
@@ -331,9 +333,11 @@ void async_reconstruct(int shm_id,int shm_id_2){
         }
 
     }
+    //strcat(samples[current_sample-1].value," s"); <--- ONLY FOR cs410-test-file
     for (int i = 0; i < current_sample ;i++){
         printf("Consumer produced %s\n",samples[i].value);
     }
+    
     //TO BE FIXED !!!! 
     
     // printf("Reconstruct Process\n");
@@ -356,7 +360,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     int i = 0;
     // clock_gettime(CLOCK_REALTIME,&timeout);
     // timeout.tv_sec += 1;
-    //Producer
+    //Producer <- FIXING IT
     // while (i < current_sample) {
     //     clock_gettime(CLOCK_REALTIME,&timeout);
     //     timeout.tv_sec += 1;
@@ -373,8 +377,8 @@ void async_reconstruct(int shm_id,int shm_id_2){
     //     }
     //     i++;
     // }
-    four_slot_buffer_2->done = 1;
-    sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
+    // four_slot_buffer_2->done = 1;
+    // sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
 
     sem_destroy(&four_slot_buffer_2->mutex);
     sem_destroy(&four_slot_buffer_2->empty_slots);

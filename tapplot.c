@@ -133,13 +133,43 @@ void sync_plot(int buffer_size, int argn, int shm_id_2){
 void async_plot(int argn, int shm_id_2){
     Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*)shmat(shm_id_2, NULL, 0);
     int num_samples = 0;
-    char samples[MAX_SAMPLES][MAX_VALUE_SIZE];
+    char *reconstructed_samples[MAX_SAMPLES];
     if (four_slot_buffer == (void*)-1) {
         perror("shmat");
         exit(1);
     }
     printf("Hello\n");
-    
+    struct timespec timeout;
+    //Consumer
+    //Code needs to be FIXED
+    // while(1){
+    //     clock_gettime(CLOCK_REALTIME, &timeout);
+    //     timeout.tv_sec += 1; // Set timeout to 1 second from now
+    //     //It will attempt to acquire the 'full_slots' semaphore within the specified timeout meaning there is data to consume
+    //     if (sem_timedwait(&four_slot_buffer->full_slots, &timeout) == 0) {
+    //         //Attempting to acquire a mutex semaphore 
+    //         //If acquired, it'll gain exclusive access to the shared buffer.
+    //         sem_wait(&four_slot_buffer->mutex); 
+    //         if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {//break out of the consumer once it has finished processed all the samples
+    //             sem_post(&four_slot_buffer->mutex);//Release all the semaphores 
+    //             sem_post(&four_slot_buffer->empty_slots);
+    //             break;
+    //         }
+    //         char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
+    //         //Copy the sample it reads into our reconstructed samples array
+    //         //strcpy(reconstructed_samples[num_inputs],result);
+    //         //printf("Consumer consumes [%d] %s\n",num_inputs,result);
+    //         reconstructed_samples[num_samples] = result;
+    //         num_samples++;
+    //         //usleep(10000);
+    //         four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;//Increment the pointer to to point to the next slot to read a sample
+    //         sem_post(&four_slot_buffer->mutex);// Release the mutex semaphore to allow other processes to access the shared buffer
+    //         sem_post(&four_slot_buffer->empty_slots);//Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
+    //     } else {
+    //         // Semaphore not available within the timeout, continue execution
+    //         continue;
+    //     }
+    // }
 
     // Destroy the semaphores
     sem_destroy(&four_slot_buffer->mutex);

@@ -183,10 +183,11 @@ void async_observe(int shm_id) {
                     sem_wait(&four_slot_buffer->mutex);//acquire a mutex lock to allow for write access to shared buffer
                     //Use sprintf to store the name-value pair in a specified format in a slot specified by "in" indice
                     sprintf(four_slot_buffer->data[four_slot_buffer->in], "%s=%s", name, value);
-                    printf("Producer produces %s\n", four_slot_buffer->data[four_slot_buffer->in]);
+                    //printf("Producer produces %s\n", four_slot_buffer->data[four_slot_buffer->in]);
                     four_slot_buffer->in = (four_slot_buffer->in + 1) % 4;//Increment in to point to the next slot in the buffer
                     sem_post(&four_slot_buffer->mutex);//Release the mutex lock to allow another process to access the shared bufefer
                     sem_post(&four_slot_buffer->full_slots);//Signal to the full slots semaphore to indicate a new slot is filled
+                    //sleep(1);
                 } else {
                     // Semaphore not available within the timeout, continue execution
                     continue;
