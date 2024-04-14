@@ -94,7 +94,7 @@ void sync_observe(int buffer_size,int shm_id){
                 //printf("%s\n",ring_buffer->data[ring_buffer->write_index]);
                 while((ring_buffer->in + 1) % buffer_size == ring_buffer->out){
                     // Buffer is full, wait for space to become available
-                    sleep(1);
+                    usleep(10000);
                 };
                 //Write the observe change to ring buffer
                 strcpy(ring_buffer->data[ring_buffer->in],result);

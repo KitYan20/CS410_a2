@@ -62,7 +62,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         // Read observed changes from the ring buffer
         while(ring_buffer->in == ring_buffer->out && !ring_buffer->done);//wait if buffer is empty
         
-        if (ring_buffer->done && ring_buffer->in == ring_buffer->out){//Finished reading all the data in the slots
+        if (ring_buffer->done){//Finished reading all the data in the slots
             // printf("Break\n");
             break;
         }
@@ -145,6 +145,9 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     // printf("Reconstruct Process\n");
     // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
     // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
+    for (int i = 0; i < current_sample ; i++){
+        printf("Constructed Samples %s\n",samples[i].value);
+    }
     RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
     ring_buffer_2->in = 0;
     ring_buffer_2->out = 0;
@@ -158,6 +161,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     //Producer
     //strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
     //printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+
     while(i < current_sample){
          while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out){
              sleep(2);
