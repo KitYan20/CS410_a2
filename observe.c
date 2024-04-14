@@ -67,7 +67,7 @@ void sync_observe(int buffer_size,int shm_id){
             char* name = input; //Get the name before "=" sign
             char* value = equals_sign + 1; //Get the value after the "=" sign
             // Find the first occurrence of newline character
-            //value[strlen(value)-2] = ',';//Uncomment To test cs410-test-file
+            value[strlen(value)-2] = ',';//Uncomment To test cs410-test-file
             char* newline = strchr(value, '\n');// Remove the newline from value
             if (newline != NULL) {
                 //*newline++ = ',';
@@ -119,61 +119,74 @@ void sync_observe(int buffer_size,int shm_id){
 }
 
 void async_observe(int shm_id) {
+    //Attach the four slot buffer to a shared memory region
     Four_Slot_Buffer *four_slot_buffer = (Four_Slot_Buffer*)shmat(shm_id, NULL, 0);
     if (four_slot_buffer == (void*)-1) {
         perror("shmat");
         exit(1);
     }
+    //initialize four-slot buffer
+    four_slot_buffer->in = 0;
+    four_slot_buffer->out = 0;
+    four_slot_buffer->done = 0;
+    //Initialize the sempahores with sem_init, every sccond argument of each semaphores is 1 to indicate the semaphore is shared between processes
+    //The mutex semaphore prevents other processes (e.g., the consumer) from accessing the buffer simultaneously
+    //the mutex semaphore is used as a binary semaphore (a mutex lock) to ensure mutual exclusion and prevent concurrent access to the shared buffer.
+    sem_init(&four_slot_buffer->mutex,1,1);//set the mutex initial value to 1
+    //The empty_slots semaphore is used to keep track of the number of empty slots in the shared buffer. Initially, all 4 slots are empty, so the semaphore is initialized with a value of 4.
+    sem_init(&four_slot_buffer->empty_slots,1,4);//set the empty slots initial value to 4 to keep track of the number of empty slots in the shared buffer
+    //The full_slots semaphore is used to keep track of the number of filled slots in the shared buffer. Initially, there are no filled slots, so the semaphore is initialized with a value of 0.
+    sem_init(&four_slot_buffer->full_slots,1,0);//set the full slots initial value to 0 since there are no filled slots in the buffer
+
     char input[256];
     char unique_names[MAX_NAMES][MAX_VALUE_LEN];
     int num_unique_names = 0;
     char end_name[MAX_VALUE_LEN] = "";
     char prev_values[MAX_NAMES][MAX_VALUE_LEN] = {0};
 
-    struct timespec timeout;
+    struct timespec timeout;//Create a timespec timeout structure
 
-    while (fgets(input, sizeof(input), stdin) != NULL) {
+    while (fgets(input, sizeof(input), stdin) != NULL) {//Read each line in a file
         char* equals_sign = strchr(input, '=');
         if (equals_sign != NULL) {
-            *equals_sign = '\0';
-            char* name = input;
-            char* value = equals_sign + 1;
+            *equals_sign = '\0';//End the name value will a null terminated character
+            char* name = input;//Get the name string
+            char* value = equals_sign + 1;//Increment the pointer to the value after the equal sign
             value[strlen(value)-2] = ',';//uncomment To test cs410-test-file
-            char* newline = strchr(value, '\n');
+            char* newline = strchr(value, '\n');//Remove the new line
             if (newline != NULL) {
-                *newline = '\0';
+                *newline = '\0';//End it with a null terminated character
             }
-
-            int existing_name_index = -1;
+            int existing_name_index = -1;//Initialize the existing name index to -1 to be used for sending the proper samples
             for (int i = 0; i < num_unique_names; i++) {
+                //A for loop to check for all the unique names in the file
+                //If the name exist, we set the index of the position where the names are identified
                 if (strcmp(unique_names[i], name) == 0) {
                     existing_name_index = i;
                     break;
                 }
             }
-
-            if (existing_name_index == -1) {
-                strcpy(unique_names[num_unique_names], name);
-                num_unique_names++;
-                if (num_unique_names > 1) {
-                    strcpy(end_name, name);
-                }
+            if (existing_name_index == -1) {//Its a new name
+                strcpy(unique_names[num_unique_names], name);//Copy the name into the unique names array
+                num_unique_names++;//Increment the number of unique names
+                // if (num_unique_names > 1) {
+                //     strcpy(end_name, name);//get the last unique to construct a sample
+                // }
             }
-
             if (strcmp(prev_values[existing_name_index], value) != 0) {
-
+                //Main code to produce the required samples
                 strcpy(prev_values[existing_name_index], value);
-
-                clock_gettime(CLOCK_REALTIME, &timeout);
-                timeout.tv_sec += 1; // Set timeout to 1 second from now
-
+                clock_gettime(CLOCK_REALTIME, &timeout);// Get the current time and store it in the 'timeout' structure
+                timeout.tv_sec += 1; // Set timeout to 1 second from the current time
+                //It will attempt to acquire the 'empty_slots' semaphore within the specified timeout
                 if (sem_timedwait(&four_slot_buffer->empty_slots, &timeout) == 0) {
-                    sem_wait(&four_slot_buffer->mutex);
+                    sem_wait(&four_slot_buffer->mutex);//acquire a mutex lock to allow for write access to shared buffer
+                    //Use sprintf to store the name-value pair in a specified format in a slot specified by "in" indice
                     sprintf(four_slot_buffer->data[four_slot_buffer->in], "%s=%s", name, value);
-                    //printf("Producer produces %s\n", four_slot_buffer->data[four_slot_buffer->in]);
-                    four_slot_buffer->in = (four_slot_buffer->in + 1) % 4;
-                    sem_post(&four_slot_buffer->mutex);
-                    sem_post(&four_slot_buffer->full_slots);
+                    printf("Producer produces %s\n", four_slot_buffer->data[four_slot_buffer->in]);
+                    four_slot_buffer->in = (four_slot_buffer->in + 1) % 4;//Increment in to point to the next slot in the buffer
+                    sem_post(&four_slot_buffer->mutex);//Release the mutex lock to allow another process to access the shared bufefer
+                    sem_post(&four_slot_buffer->full_slots);//Signal to the full slots semaphore to indicate a new slot is filled
                 } else {
                     // Semaphore not available within the timeout, continue execution
                     continue;
@@ -182,13 +195,9 @@ void async_observe(int shm_id) {
         }
     }
 
-    four_slot_buffer->done = 1;
-    sem_post(&four_slot_buffer->full_slots);
-
-    sem_destroy(&four_slot_buffer->mutex);
-    sem_destroy(&four_slot_buffer->empty_slots);
-    sem_destroy(&four_slot_buffer->full_slots);
-
+    four_slot_buffer->done = 1;//Indicate that the buffer has processed all the samples 
+    sem_post(&four_slot_buffer->full_slots);//Release the full slots lock to allow for consumer to proceed
+    //Detach from the shared memory
     if (shmdt(four_slot_buffer) == -1) {
         perror("shmdt");
         exit(1);
@@ -197,9 +206,9 @@ void async_observe(int shm_id) {
 
 int main(int argc, char *argv[]) {
     //printf("Buffer size %d\n",atoi(argv[1]));
-    int buffer_size = atoi(argv[1]);
-    char *buffer_option = argv[3];
-    int shm_id = atoi(argv[4]);
+    int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
+    char *buffer_option = argv[3];//get the buffer option
+    int shm_id = atoi(argv[4]);//get the shared memory id
     //printf("Buffer option %s\n",buffer_option);
     if (strcmp(buffer_option,"sync") == 0){
         //printf("Observe Id %d\n",shm_id);

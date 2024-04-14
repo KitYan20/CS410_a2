@@ -37,7 +37,7 @@ typedef struct {
 
 void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
-    char *meme[MAX_SAMPLES];
+    char reconstructed_samples[MAX_SAMPLES][MAX_SAMPLES];//Using array of pointers to characters (pointers to strings)
     int num_inputs = 0;
     char unique_names[MAX_NAMES][MAX_NAMES];
     int num_unique_names = 0;
@@ -66,23 +66,21 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
             // printf("Break\n");
             break;
         }
-        char *result = strdup(ring_buffer->data[ring_buffer->out]);
-        //printf("%s\n",meme[num_inputs]);
-        meme[num_inputs] = result;
-        
-        ring_buffer->out = (ring_buffer->out + 1) % buffer_size;//Move on the next name value pair to read
+        //Copy the read value into the array
+        strcpy(reconstructed_samples[num_inputs],ring_buffer->data[ring_buffer->out]);
+        //printf("Consumer consumed %s\n",ring_buffer->data[ring_buffer->out]);
         num_inputs++;
-        
+        ring_buffer->out = (ring_buffer->out + 1) % buffer_size;//Move on the next name value pair to read
         //sleep(2); 
     }
     printf("\n");
     
     // for (int i = 0; i < num_inputs; i++){
-    //     printf("[%d] %s\n",i,meme[i]);
+    //     printf("[%d] %s \n",i,reconstructed_samples[i]);
     // }
     //printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
-        char *comma = strchr(meme[i],',');
+        char *comma = strchr(reconstructed_samples[i],',');
         if (comma != NULL){
             *comma = '\0';
         }
@@ -90,7 +88,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
-        char *token = strdup(meme[i]);
+        char *token = strdup(reconstructed_samples[i]);
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
 
@@ -103,10 +101,6 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         if (is_new_name) {
             strcpy(unique_names[num_unique_names], name);
             num_unique_names++;
-            if (num_unique_names == MAX_NAMES) {
-                fprintf(stderr, "Error: Maximum number of unique names exceeded\n");
-                
-            }
         } else {//Gets the last name from observe program
             strcpy(end_name, name);
         }
@@ -116,7 +110,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     // printf("%d\n",num_unique_names);
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
-        char *token = meme[i];
+        char *token = reconstructed_samples[i];
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
         // now we have name and value
@@ -216,8 +210,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
 
 void async_reconstruct(int shm_id,int shm_id_2){
     Sample samples[MAX_SAMPLES];
-    char *input_samples[MAX_SAMPLES];
-    char *meme[MAX_SAMPLES];
+    char reconstructed_samples[MAX_SAMPLES][MAX_SAMPLES];
     int num_inputs = 0;
     char unique_names[MAX_NAMES][MAX_NAMES];
     int num_unique_names = 0;
@@ -232,26 +225,28 @@ void async_reconstruct(int shm_id,int shm_id_2){
         exit(1);
     }
     struct timespec timeout;
+    //Consumer
     while(1){
         clock_gettime(CLOCK_REALTIME, &timeout);
         timeout.tv_sec += 1; // Set timeout to 1 second from now
+        //It will attempt to acquire the 'full_slots' semaphore within the specified timeout meaning there is data to consume
         if (sem_timedwait(&four_slot_buffer->full_slots, &timeout) == 0) {
-            sem_wait(&four_slot_buffer->mutex);
-
-            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {
-                sem_post(&four_slot_buffer->mutex);
+            //Attempting to acquire a mutex semaphore 
+            //If acquired, it'll gain exclusive access to the shared buffer.
+            sem_wait(&four_slot_buffer->mutex); 
+            if (four_slot_buffer->done) {//break out of the consumer once it has finished processed all the samples
+                sem_post(&four_slot_buffer->mutex);//Release all the semaphores 
                 sem_post(&four_slot_buffer->empty_slots);
                 break;
             }
-            char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
+            //Copy the sample it reads into our reconstructed samples array
+            strcpy(reconstructed_samples[num_inputs],four_slot_buffer->data[four_slot_buffer->out]);
             //printf("Consumer consumes [%d] %s\n",num_inputs,result);
-            meme[num_inputs] = result;
             num_inputs++;
             //usleep(10000);
-            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
-            sem_post(&four_slot_buffer->mutex);
-            sem_post(&four_slot_buffer->empty_slots);
-
+            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;//Increment the pointer to to point to the next slot to read a sample
+            sem_post(&four_slot_buffer->mutex);// Release the mutex semaphore to allow other processes to access the shared buffer
+            sem_post(&four_slot_buffer->empty_slots);//Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
         } else {
             // Semaphore not available within the timeout, continue execution
             continue;
@@ -266,7 +261,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     // }
 
     for (int i = 0; i < num_inputs; i++){
-        char *comma = strchr(meme[i],',');
+        char *comma = strchr(reconstructed_samples[i],',');
         if (comma != NULL){
             *comma = '\0';
         }
@@ -274,7 +269,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
-        char *token = strdup(meme[i]);
+        char *token = strdup(reconstructed_samples[i]);
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
 
@@ -300,7 +295,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     // printf("%d\n",num_unique_names);
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
-        char *token = meme[i];
+        char *token = reconstructed_samples[i];
         char *name = strtok(token, "=");
         char* value = strtok(NULL, "=");
         // now we have name and value
@@ -335,6 +330,8 @@ void async_reconstruct(int shm_id,int shm_id_2){
     for (int i = 0; i < current_sample ;i++){
         printf("Consumer produced %s\n",samples[i].value);
     }
+    //TO BE FIXED !!!! 
+    
     // printf("Reconstruct Process\n");
     // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
     // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
@@ -348,7 +345,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     four_slot_buffer_2->in = 0;
     four_slot_buffer_2->out = 0;
     four_slot_buffer_2->done = 0;
-    // //Initialize the sempahores with sem_init
+    //Initialize the sempahores with sem_init
     sem_init(&four_slot_buffer_2->mutex,1,1);
     sem_init(&four_slot_buffer_2->empty_slots,1,4);
     sem_init(&four_slot_buffer_2->full_slots,1,0);
