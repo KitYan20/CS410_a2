@@ -7,23 +7,11 @@
 #include <sys/shm.h>
 #include <time.h>
 #include <semaphore.h>
-#include <fcntl.h>           /* For O_* constants */
-#include <sys/stat.h>        /* For mode constants */
 
-#define MAX_NAME_LEN 100
-#define MAX_VALUE_LEN 1064
+
 #define MAX_NAMES 100
-
-#define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
 
-// typedef struct {
-//     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
-//     int in;
-//     int out;
-//     int done;
-
-// } RingBuffer;
 typedef struct {
     char data[4][MAX_VALUE_SIZE];
     int in;
@@ -34,10 +22,6 @@ typedef struct {
     int done;
 } Four_Slot_Buffer;
 
-typedef struct {
-    char name_value[MAX_VALUE_LEN];
-} NameValue;
-
 void sync_observe(int buffer_size,int shm_id){
     typedef struct {
         char data[buffer_size][MAX_VALUE_SIZE];
@@ -47,18 +31,22 @@ void sync_observe(int buffer_size,int shm_id){
     } RingBuffer;
 
     char input[256];//Initialize an array of chars to store our line of inputs from stdin or a file
-    NameValue unique_names[MAX_NAMES];//create our NameValue struct data type object with size up to 100 names
-    int num_unique_names = 0;//This will be our counter to count how many name_value pairs are stored 
-    char result[256];//A result string to combine both the name and value of a input line
-
+    char unique_names[MAX_NAMES][MAX_VALUE_SIZE];//Initialize an array of unique names strings
+    int num_unique_names = 0;//Count the number of unique names the file
+    char end_name[MAX_VALUE_SIZE] = "";
+    char prev_values[MAX_NAMES][MAX_VALUE_SIZE] = {0};//Keep track of all the values it has encountered in the file
+    int num_inputs = 0;
+    char samples[MAX_VALUE_SIZE][MAX_VALUE_SIZE];
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
     if (ring_buffer == (void*)-1){
         perror("shmat");
         exit(1);
     }
+    ring_buffer->in = 0;
+    ring_buffer->out = 0;
+    ring_buffer->done = 0;
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
-        
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
         if (equals_sign != NULL) {
             *equals_sign = '\0';  // Null-terminate the value
@@ -68,52 +56,42 @@ void sync_observe(int buffer_size,int shm_id){
             value[strlen(value)-2] = ',';//Uncomment To test cs410-test-file
             char* newline = strchr(value, '\n');// Remove the newline from value
             if (newline != NULL) {
-                //*newline++ = ',';
                 *newline = '\0';//End it with a null terminated character
-            }
-            strcpy(result,name);//copy the name into the results string
-            strcat(result,"=");//concatenate the string with "="
-            strcat(result,value);//concatenate the string after "=" with the value
-            //value[strlen(value)] = ',';
-            
-            //printf("%s\n",result);
-            int existing_name_index = 0;//initialize this variable to check if duplicate names appeared more than once
+            }            
+            int existing_name_index = -1;//initialize this variable to check if duplicate names appeared more than once
             for (int i = 0 ; i < num_unique_names; i++){//Iterate through the list of name_value pairs in unique_names
-                if (strcmp(unique_names[i].name_value,result) == 0){//If the name_value already exist, we can break
-                    existing_name_index = 1;//Change the value to 1 to indicate the name already appeared once
+                if (strcmp(unique_names[i],name) == 0){//If the name_value already exist, we can break
+                    existing_name_index = i;//Change the value to 1 to indicate the name already appeared once
                     break;
                 }
             }
-            //If name does not exist
-            if (existing_name_index == 0){
-                strcpy(unique_names[num_unique_names].name_value,result);//Copy the result of the string into the corresponding indice into the struct
-                num_unique_names++;//Increment to move on to the next position
-
-                //printf("%s\n",ring_buffer->data[ring_buffer->write_index]);
-                while((ring_buffer->in + 1) % buffer_size == ring_buffer->out){
-                    // Buffer is full, wait for space to become available
-                    usleep(10000);
-                };
-                //Write the observe change to ring buffer
-                strcpy(ring_buffer->data[ring_buffer->in],result);
-                printf("Producer produces %s\n",ring_buffer->data[ring_buffer->in]);
-                ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
-                //sleep(1);
-                
+            if (existing_name_index == -1) {//Its a new name
+                strcpy(unique_names[num_unique_names], name);//Copy the name into the unique names array
+                num_unique_names++;//Increment the number of unique names
             }
-            memset(result,'\0',sizeof(result));
+            //If name does not exist
+            if (strcmp(prev_values[existing_name_index], value) != 0){
+                strcpy(prev_values[existing_name_index], value);
+                sprintf(samples[num_inputs],"%s=%s", name, value);
+                num_inputs++;
+            }   
         }
+    }
+    int i = 0;
+    while (i < num_inputs){
+        // printf("%s\n",samples[i]);
+        while((ring_buffer->in + 1) % buffer_size == ring_buffer->out);
+        // // Buffer is full, wait for space to become available
+        strcpy(ring_buffer->data[ring_buffer->in],samples[i]);
+        // // printf("Producer produced [%d] %s\n",i, ring_buffer->data[ring_buffer->in]);
+        ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
+        i++;
     }
     // Continue processing until all input is consumed
     while (ring_buffer->in != ring_buffer->out) {
-        sleep(1);
+         sleep(1);
     }
     ring_buffer->done = 1;//Ring buffer is done processing
-    //Detach shared memory segment
-    if (shmdt(ring_buffer) == -1) {
-        perror("shmdt");
-        exit(1);
-    }
 }
 
 void async_observe(int shm_id) {
@@ -137,10 +115,10 @@ void async_observe(int shm_id) {
     sem_init(&four_slot_buffer->full_slots,1,0);//set the full slots initial value to 0 since there are no filled slots in the buffer
 
     char input[256];//Store the input from each line the file
-    char unique_names[MAX_NAMES][MAX_VALUE_LEN];//Initialize an array of unique names strings
+    char unique_names[MAX_NAMES][MAX_VALUE_SIZE];//Initialize an array of unique names strings
     int num_unique_names = 0;//Count the number of unique names the file
-    char end_name[MAX_VALUE_LEN] = "";
-    char prev_values[MAX_NAMES][MAX_VALUE_LEN] = {0};//Keep track of all the values it has encountered in the file
+    char end_name[MAX_VALUE_SIZE] = "";
+    char prev_values[MAX_NAMES][MAX_VALUE_SIZE] = {0};//Keep track of all the values it has encountered in the file
 
     //struct timespec timeout;//Create a timespec timeout structure
 
@@ -203,24 +181,15 @@ void async_observe(int shm_id) {
             }
         }
     }
-
     four_slot_buffer->done = 1;//Indicate that the buffer has processed all the samples 
     sem_post(&four_slot_buffer->full_slots);//Release the full slots lock to allow for consumer to proceed
-    //Detach from the shared memory
-    if (shmdt(four_slot_buffer) == -1) {
-        perror("shmdt");
-        exit(1);
-    }
 }
 
 int main(int argc, char *argv[]) {
-    //printf("Buffer size %d\n",atoi(argv[1]));
     int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
     char *buffer_option = argv[3];//get the buffer option
     int shm_id = atoi(argv[4]);//get the shared memory id
-    //printf("Buffer option %s\n",buffer_option);
     if (strcmp(buffer_option,"sync") == 0){
-        //printf("Observe Id %d\n",shm_id);
         sync_observe(buffer_size,shm_id);
     }else{
         //printf("Observe %s\n",buffer_option);

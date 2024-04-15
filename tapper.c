@@ -33,6 +33,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
         int out;
         int done;
     }RingBuffer;
+
     //Create a shared memory id for observe and reconstruct
     int shm_id = shmget(IPC_PRIVATE,sizeof(RingBuffer), IPC_CREAT | 0666);//Shared Memory ID
     // Create shared memory segment

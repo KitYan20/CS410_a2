@@ -13,6 +13,9 @@ time=40 s
 expt=2
 temperature=64 F
 time=50 s
+expt=2
+temperature=69 F
+time=80 s
 expt=3
 temperature=70 F
 time=60 s
@@ -25,7 +28,6 @@ time=170 s
 expt=3
 temperature=505 F
 time=270 s
-
 
 
 

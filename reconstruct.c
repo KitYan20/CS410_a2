@@ -7,23 +7,13 @@
 #include <sys/shm.h>
 #include <time.h>
 #include <semaphore.h>
-#include <fcntl.h>           /* For O_* constants */
-#include <sys/stat.h>        /* For mode constants */
-
-#define BUFFER_SIZE 10
 #define MAX_VALUE_SIZE 1064
-#define MAX_SAMPLES 2128
+#define MAX_SAMPLES 1064
 #define MAX_NAMES 256
 
-// typedef struct {
-//     char data[BUFFER_SIZE][MAX_VALUE_SIZE];
-//     int in;
-//     int out;
-//     int done;
-// } RingBuffer;
 typedef struct {
     int sample_number;
-    char value[MAX_NAMES];
+    char value[MAX_VALUE_SIZE];
 } Sample;
 typedef struct {
     char data[4][MAX_VALUE_SIZE];
@@ -49,7 +39,6 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         int out;
         int done;
     } RingBuffer;
-
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
 
@@ -57,13 +46,10 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         perror("shmat");
         exit(1);
     }
-    
     while(1){
         // Read observed changes from the ring buffer
         while(ring_buffer->in == ring_buffer->out && !ring_buffer->done);//wait if buffer is empty
-        
         if (ring_buffer->done){//Finished reading all the data in the slots
-            // printf("Break\n");
             break;
         }
         //Copy the read value into the array
@@ -73,18 +59,14 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         ring_buffer->out = (ring_buffer->out + 1) % buffer_size;//Move on the next name value pair to read
         //sleep(2); 
     }
-    printf("\n");
-    
     // for (int i = 0; i < num_inputs; i++){
-    //     printf("[%d] %s \n",i,reconstructed_samples[i]);
+    //     printf("Consumer produce [%d] %s \n",i,reconstructed_samples[i]);
     // }
-    //printf("Num inputs %d\n",num_inputs);
     for (int i = 0; i < num_inputs; i++){
         char *comma = strchr(reconstructed_samples[i],',');
         if (comma != NULL){
             *comma = '\0';
         }
-        //printf("%s\n",meme[i]);
     }
     for (int i = 0; i < num_inputs; i++){
         int is_new_name = 1;
@@ -106,8 +88,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         }
         
     }
-    char prev_values[MAX_NAMES][MAX_NAMES] = {0};
-    // printf("%d\n",num_unique_names);
+    char prev_values[MAX_SAMPLES][MAX_VALUE_SIZE] = {0};
     // loop through all input data tokens to fill samples[] 
     for (int i = 0; i < num_inputs; i++) {
         char *token = reconstructed_samples[i];
@@ -122,7 +103,6 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
                 strcat(samples[current_sample].value, prev_values[j]);
                 strcat(samples[current_sample].value, ", ");
             }
-
             // printf("End of current sample, which is %d\n", current_sample);
             strcat(samples[current_sample].value, name);
             strcat(samples[current_sample].value, "=");
@@ -142,36 +122,31 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         }
 
     }
-    // printf("Reconstruct Process\n");
-    // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
-    // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
-    for (int i = 0; i < current_sample ; i++){
-        printf("Constructed Samples %s\n",samples[i].value);
-    }
+    strcat(samples[current_sample-1].value," s");
+    // for (int i = 0; i < current_sample ; i++){
+    //     printf("Constructed Samples %s\n",samples[i].value);
+    // }
     RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
     ring_buffer_2->in = 0;
     ring_buffer_2->out = 0;
     ring_buffer_2->done = 0;
 
+    for (int i = 0; i < buffer_size ; i++){
+        memset(ring_buffer->data[i], 0, MAX_VALUE_SIZE);
+    }
     if (ring_buffer_2 == (void*)-1){
         perror("shmat");
         exit(1);
     }
     int i = 0;
-    //Producer
-    //strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
-    //printf("Producer produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
-
+    //Producer 
     while(i < current_sample){
-         while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out){
-             sleep(2);
-         };// Wait if the buffer is full
-    
-         strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
-         printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
-         i++;
-         ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
-         //sleep(1);
+          while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out);// Wait if the buffer is full
+          strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+          //printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
+          i++;
+          ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
+          //sleep(1);
          
     }
     ring_buffer_2->done = 1;//Ring buffer is done processing
@@ -201,15 +176,12 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     // }
     // fclose(gnuplot_file);
 
-    //Detach shared memory segment
+    //Detach shared memory segment from observe to reconstruct
     if (shmdt(ring_buffer) == -1) {
         perror("shmdt");
         exit(1);
     }
-    if (shmdt(ring_buffer_2) == -1) {
-        perror("shmdt");
-        exit(1);
-    }
+    
 }
 
 void async_reconstruct(int shm_id,int shm_id_2,int argn){
@@ -350,16 +322,12 @@ void async_reconstruct(int shm_id,int shm_id_2,int argn){
         }
 
     }
-    //strcat(samples[current_sample-1].value," s"); //<--- ONLY FOR cs410-test-file
+    strcat(samples[current_sample-1].value," s"); //<--- ONLY FOR cs410-test-file
     // for (int i = 0; i < current_sample ;i++){
     //     printf("Consumer produced %s\n",samples[i].value);
     // }
     
     //TO BE FIXED !!!! 
-    
-    // printf("Reconstruct Process\n");
-    // printf("Observe to Reconstruct Consumer ID 1 %d\n",shm_id);
-    // printf("Reconstruct to Tapplot Producer ID 2 %d\n",shm_id_2);
     Four_Slot_Buffer *four_slot_buffer_2 = (Four_Slot_Buffer*) shmat(shm_id_2,NULL,0);
 
     if (four_slot_buffer_2 == (void*)-1){
@@ -393,7 +361,7 @@ void async_reconstruct(int shm_id,int shm_id_2,int argn){
                 if (value != NULL) {
                     value++;
                     fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-                    fprintf(stdout,"Sample Number: %d Distance: %s\n", samples[i].sample_number, value);
+                    fprintf(stdout,"Sample Number:%d - Value:%s\n", samples[i].sample_number, value);
                 }
                 break;
             }
@@ -440,17 +408,12 @@ void async_reconstruct(int shm_id,int shm_id_2,int argn){
     // sem_destroy(&four_slot_buffer_2->full_slots);
 
     //printf("Done\n");
-    //Detach shared memory segment
+    //Detach shared memory segment between observe and reconstruct
     if (shmdt(four_slot_buffer) == -1) {
         perror("shmdt");
         exit(1);
     }
-    if (shmdt(four_slot_buffer_2) == -1) {
-        perror("shmdt");
-        exit(1);
-    }
-    
-    
+
 }
 
 int main(int argc, char *argv[]){
