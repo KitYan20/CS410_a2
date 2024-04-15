@@ -77,16 +77,16 @@ void sync_observe(int buffer_size,int shm_id){
             }   
         }
     }
-    for (int i ; i < num_inputs ; i++){ //<--- Use this to test out tappet output of observe
-        printf("%s\n",samples[i]);
-    }
+    // for (int i ; i < num_inputs ; i++){ //<--- Use this to test out tappet output of observe
+    //     printf("%s\n",samples[i]);
+    // }
     int i = 0;
     while (i < num_inputs){
         // printf("%s\n",samples[i]);
         while((ring_buffer->in + 1) % buffer_size == ring_buffer->out);
         // // Buffer is full, wait for space to become available
         strcpy(ring_buffer->data[ring_buffer->in],samples[i]);
-        // // printf("Producer produced [%d] %s\n",i, ring_buffer->data[ring_buffer->in]);
+        //printf("Producer produced [%d] %s\n",i, ring_buffer->data[ring_buffer->in]);
         ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
         i++;
     }
@@ -96,6 +96,11 @@ void sync_observe(int buffer_size,int shm_id){
     }
     ring_buffer->done = 1;//Ring buffer is done processing
     
+    //Detach shared memory segment from observe to reconstruct
+    if (shmdt(ring_buffer) == -1) {
+        perror("shmdt");
+        exit(1);
+    }
 }
 
 void async_observe(int shm_id) {
@@ -189,15 +194,15 @@ void async_observe(int shm_id) {
     sem_post(&four_slot_buffer->full_slots);//Release the full slots lock to allow for consumer to proceed
 }
 
-int main(int argc, char *argv[]) {
-    int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
-    char *buffer_option = argv[3];//get the buffer option
-    int shm_id = atoi(argv[4]);//get the shared memory id
-    if (strcmp(buffer_option,"sync") == 0){
-        sync_observe(buffer_size,shm_id);
-    }else{
-        //printf("Observe %s\n",buffer_option);
-        async_observe(shm_id);
-    }
-    return 0;
-}
+// int main(int argc, char *argv[]) {
+//     int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
+//     char *buffer_option = argv[3];//get the buffer option
+//     int shm_id = atoi(argv[4]);//get the shared memory id
+//     if (strcmp(buffer_option,"sync") == 0){
+//         sync_observe(buffer_size,shm_id);
+//     }else{
+//         //printf("Observe %s\n",buffer_option);
+//         async_observe(shm_id);
+//     }
+//     return 0;
+// }

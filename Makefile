@@ -2,7 +2,7 @@ CC = gcc
 DEBUG=-g
 OPT=-O0
 PROGS = myshell
-OBJS = observe.o reconstruct.o 
+OBJS = observe.o reconstruct.o tapplot.o
 SLIBS= sharedlibrary.so 
 LDLIBS = -ldl
 LD = -L.
@@ -12,7 +12,7 @@ LD = -L.
 .SILENT: TAPPER TAPPET clean_tapper clean_tappet
 all: myshell TAPPER TAPPET
 TAPPER: tapper observe reconstruct tapplot
-TAPPET: tappet observe reconstruct tapplot sharedlibrary.so
+TAPPET: tappet sharedlibrary.so
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tappet: tappet.o $(SLIBS)
