@@ -2,18 +2,21 @@ CC = gcc
 DEBUG=-g
 OPT=-O0
 PROGS = myshell
-OBJS = myshell.o
+OBJS = observe.o reconstruct.o 
+SLIBS= sharedlibrary.so 
+LDLIBS = -ldl
+LD = -L.
 %.o:%.c
-	$(CC) -c ${OPT} ${DEBUG} $< -o $@
+	$(CC) -fPIC -c ${OPT} ${DEBUG} $< -o $@
 .PHONY: all TAPPER TAPPET clean_tapper clean_tappet 
 .SILENT: TAPPER TAPPET clean_tapper clean_tappet
-all: myshell
+all: myshell TAPPER TAPPET
 TAPPER: tapper observe reconstruct tapplot
-TAPPET: tappet observe reconstruct tapplot
+TAPPET: tappet observe reconstruct tapplot sharedlibrary.so
 myshell: $(OBJS)
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
-tappet: tappet.o
-	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@  
+tappet: tappet.o $(SLIBS)
+	$(CC) $(LD) ${OPT} ${DEBUG} $^ $(LDLIBS) -lrt -lpthread -o $@  
 tapper: tapper.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@  
 observe: observe.o
@@ -22,7 +25,11 @@ reconstruct: reconstruct.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
 tapplot: tapplot.o
 	$(CC) ${OPT} ${DEBUG} $^ -lrt -lpthread -o $@ 
+sharedlibrary.so: $(OBJS)
+	$(CC) -shared -o $@ $^
+clean:
+	rm -f *.o *.so TAPPER TAPPET myshell observe tapper reconstruct tapplot
 clean_tapper:
-	rm *.o observe tapper reconstruct tapplot
+	rm -f *.o observe tapper reconstruct tapplot myshell
 clean_tappet:
-	rm *.o observe tappet reconstruct tapplot	
+	rm -f *.o observe tappet reconstruct tapplot myshell

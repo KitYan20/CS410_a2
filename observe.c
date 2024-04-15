@@ -77,6 +77,9 @@ void sync_observe(int buffer_size,int shm_id){
             }   
         }
     }
+    for (int i ; i < num_inputs ; i++){ //<--- Use this to test out tappet output of observe
+        printf("%s\n",samples[i]);
+    }
     int i = 0;
     while (i < num_inputs){
         // printf("%s\n",samples[i]);
@@ -92,6 +95,7 @@ void sync_observe(int buffer_size,int shm_id){
          sleep(1);
     }
     ring_buffer->done = 1;//Ring buffer is done processing
+    
 }
 
 void async_observe(int shm_id) {
