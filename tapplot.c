@@ -138,69 +138,81 @@ void async_plot(int argn, int shm_id_2){
         perror("shmat");
         exit(1);
     }
-    printf("Hello\n");
+    
+    FILE *gnuplot_pipe = popen("gnuplot -persist", "w");
+    if (gnuplot_pipe == NULL) {
+        perror("Error opening gnuplot pipe");
+        exit(1);
+    }
+
+    fprintf(gnuplot_pipe, "set title 'Plot'\n");
+    fprintf(gnuplot_pipe, "set xlabel 'Sample Number'\n");
+    fprintf(gnuplot_pipe, "set ylabel 'Value'\n");
+    fprintf(gnuplot_pipe, "plot 'data.txt' with lines\n");
+
+    pclose(gnuplot_pipe);
     //printf("Consumer consumed %s\n",four_slot_buffer->data[four_slot_buffer->out]);
     //struct timespec timeout;
     //Consumer
     //Code needs to be FIXED
     // Consumer
-    while (1) {
-        //sem_trywait attempts to acquire the semaphore immediately and returns if it is not available
-        //If sem_trywait successfully acquires the empty_slots semaphore, the code proceeds as before, 
-        //writing the name-value pair to the shared buffer.
-        // Attempt to acquire the 'full_slots' semaphore using sem_trywait
-        if (sem_trywait(&four_slot_buffer->full_slots) == 0) {
-            // If the semaphore is acquired successfully
-            // Attempting to acquire a mutex semaphore
-            // If acquired, it'll gain exclusive access to the shared buffer
-            sem_wait(&four_slot_buffer->mutex);
-            // Check if the producer is done and the buffer is empty
-            if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {
-                // Release all the semaphores
-                sem_post(&four_slot_buffer->mutex);
-                sem_post(&four_slot_buffer->empty_slots);
-                break;
-            }
-            // Copy the sample it reads into our reconstructed samples array
-            char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
-            reconstructed_samples[num_inputs] = result;
-            num_inputs++;
-            // Increment the pointer to point to the next slot to read a sample
-            four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
-            // Release the mutex semaphore to allow other processes to access the shared buffer
-            sem_post(&four_slot_buffer->mutex);
-            // Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
-            sem_post(&four_slot_buffer->empty_slots);
-        //If sem_trywait fails to acquire the semaphore (i.e., returns a non-zero value), 
-        //it means that there are no empty slots available in the buffer. 
-        //In this case, the code checks if the consumer is done by acquiring the mutex semaphore and checking the done flag. 
-        //If the consumer is done, the code releases the mutex semaphore and breaks out of the loop.
-        // If the consumer is not done, the code releases the mutex semaphore and waits for a short duration (10 milliseconds) using nanosleep before trying again.   
-        } else {
-            // Semaphore not available, check if the producer is done
-            sem_wait(&four_slot_buffer->mutex);
-            if (four_slot_buffer->done) {
-                sem_post(&four_slot_buffer->mutex);
-                break;
-            }
-            sem_post(&four_slot_buffer->mutex);//Release the mutex semaphore to allow other processes to access shared buffer
+    // while (1) {
+    //     //sem_trywait attempts to acquire the semaphore immediately and returns if it is not available
+    //     //If sem_trywait successfully acquires the empty_slots semaphore, the code proceeds as before, 
+    //     //writing the name-value pair to the shared buffer.
+    //     // Attempt to acquire the 'full_slots' semaphore using sem_trywait
+    //     if (sem_trywait(&four_slot_buffer->full_slots) == 0) {
+    //         // If the semaphore is acquired successfully
+    //         // Attempting to acquire a mutex semaphore
+    //         // If acquired, it'll gain exclusive access to the shared buffer
+    //         sem_wait(&four_slot_buffer->mutex);
+    //         // Check if the producer is done and the buffer is empty
+    //         if (four_slot_buffer->done && four_slot_buffer->in == four_slot_buffer->out) {
+    //             // Release all the semaphores
+    //             sem_post(&four_slot_buffer->mutex);
+    //             sem_post(&four_slot_buffer->empty_slots);
+    //             break;
+    //         }
+    //         // Copy the sample it reads into our reconstructed samples array
+    //         char *result = strdup(four_slot_buffer->data[four_slot_buffer->out]);
+    //         reconstructed_samples[num_inputs] = result;
+    //         num_inputs++;
+    //         // Increment the pointer to point to the next slot to read a sample
+    //         four_slot_buffer->out = (four_slot_buffer->out + 1) % 4;
+    //         // Release the mutex semaphore to allow other processes to access the shared buffer
+    //         sem_post(&four_slot_buffer->mutex);
+    //         // Signal the empty_slots semaphore to indicate that a slot has been consumed and is now empty
+    //         sem_post(&four_slot_buffer->empty_slots);
+    //     //If sem_trywait fails to acquire the semaphore (i.e., returns a non-zero value), 
+    //     //it means that there are no empty slots available in the buffer. 
+    //     //In this case, the code checks if the consumer is done by acquiring the mutex semaphore and checking the done flag. 
+    //     //If the consumer is done, the code releases the mutex semaphore and breaks out of the loop.
+    //     // If the consumer is not done, the code releases the mutex semaphore and waits for a short duration (10 milliseconds) using nanosleep before trying again.   
+    //     } else {
+    //         // Semaphore not available, check if the producer is done
+    //         sem_wait(&four_slot_buffer->mutex);
+    //         if (four_slot_buffer->done) {
+    //             sem_post(&four_slot_buffer->mutex);
+    //             break;
+    //         }
+    //         sem_post(&four_slot_buffer->mutex);//Release the mutex semaphore to allow other processes to access shared buffer
 
-            // Wait for a short duration using nanosleep before trying again
-            struct timespec wait_time;
-            wait_time.tv_sec = 0;
-            wait_time.tv_nsec = 10000000; // 10 milliseconds
-            nanosleep(&wait_time, NULL);
-        }
-    }
+    //         // Wait for a short duration using nanosleep before trying again
+    //         struct timespec wait_time;
+    //         wait_time.tv_sec = 0;
+    //         wait_time.tv_nsec = 10000000; // 10 milliseconds
+    //         nanosleep(&wait_time, NULL);
+    //     }
+    // }
 
     // Destroy the semaphores
     sem_destroy(&four_slot_buffer->mutex);
     sem_destroy(&four_slot_buffer->empty_slots);
     sem_destroy(&four_slot_buffer->full_slots);
 
-    for (int i = 0; i < num_inputs ; i++){
-        printf("Consumer 2 consumed %s\n",reconstructed_samples[i]);
-    }
+    // for (int i = 0; i < num_inputs ; i++){
+    //     printf("Consumer 2 consumed %s\n",reconstructed_samples[i]);
+    // }
     if (shmdt(four_slot_buffer) == -1) {
     perror("shmdt");
     exit(1);
@@ -217,7 +229,5 @@ int main(int argc, char *argv[]) {
     }else{
         async_plot(argn,shm_id_2);
     }
-
-
     return 0;
 }

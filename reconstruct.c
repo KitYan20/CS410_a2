@@ -212,7 +212,7 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     }
 }
 
-void async_reconstruct(int shm_id,int shm_id_2){
+void async_reconstruct(int shm_id,int shm_id_2,int argn){
     Sample samples[MAX_SAMPLES];
     char *reconstructed_samples[MAX_SAMPLES];
     int num_inputs = 0;
@@ -269,7 +269,6 @@ void async_reconstruct(int shm_id,int shm_id_2){
                 break;
             }
             sem_post(&four_slot_buffer->mutex);//Release the mutex semaphore to allow other processes to access shared buffer
-
             // Wait for a short duration using nanosleep before trying again
             struct timespec wait_time;
             wait_time.tv_sec = 0;
@@ -280,6 +279,7 @@ void async_reconstruct(int shm_id,int shm_id_2){
     // for (int i = 0;i<num_inputs;i++){
     //     printf("Consumer consumes [%d] %s %ld\n",i,reconstructed_samples[i],strlen(reconstructed_samples[i]));
     // }
+    //Destroy all the semaphores
     sem_destroy(&four_slot_buffer->mutex);
     sem_destroy(&four_slot_buffer->empty_slots);
     sem_destroy(&four_slot_buffer->full_slots);
@@ -350,10 +350,10 @@ void async_reconstruct(int shm_id,int shm_id_2){
         }
 
     }
-    strcat(samples[current_sample-1].value," s"); //<--- ONLY FOR cs410-test-file
-    for (int i = 0; i < current_sample ;i++){
-        printf("Consumer produced %s\n",samples[i].value);
-    }
+    //strcat(samples[current_sample-1].value," s"); //<--- ONLY FOR cs410-test-file
+    // for (int i = 0; i < current_sample ;i++){
+    //     printf("Consumer produced %s\n",samples[i].value);
+    // }
     
     //TO BE FIXED !!!! 
     
@@ -377,36 +377,63 @@ void async_reconstruct(int shm_id,int shm_id_2){
     int i = 0;
     //clock_gettime(CLOCK_REALTIME,&timeout);
     //timeout.tv_sec += 1;
-    //Producer <- FIXING IT
-    while (i < current_sample) {
-        // clock_gettime(CLOCK_REALTIME,&timeout);
-        // timeout.tv_sec += 1;
-        if (sem_trywait(&four_slot_buffer_2->empty_slots) == 0){
-            sem_wait(&four_slot_buffer_2->mutex);
-            strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
-            printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
-            four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
-            sem_post(&four_slot_buffer_2->mutex);
-            sem_post(&four_slot_buffer_2->full_slots);
-            
-        }else{
-            // Semaphore not available within the timeout, continue execution
-            sem_wait(&four_slot_buffer_2->mutex);
-            if (four_slot_buffer_2->done){
-                sem_post(&four_slot_buffer_2->mutex);
+
+    FILE *gnuplot_file = fopen("data.txt", "w");
+    if (gnuplot_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+    for (int i = 0; i < current_sample; i++) {
+        //printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
+        char *token = strtok(samples[i].value, ",");
+        int field_count = 1;
+        while (token != NULL) {
+            if (field_count == argn) {
+                char *value = strchr(token, '=');
+                if (value != NULL) {
+                    value++;
+                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
+                    fprintf(stdout,"Sample Number: %d Distance: %s\n", samples[i].sample_number, value);
+                }
                 break;
             }
-            sem_post(&four_slot_buffer_2->mutex);
-            // Wait for a short duration using nano sleep before trying again
-            struct timespec wait_time;
-            wait_time.tv_sec = 0;
-            wait_time.tv_nsec = 20000000; // 10 milliseconds
-            nanosleep(&wait_time, NULL);
+            token = strtok(NULL, ",");
+            field_count++;
         }
-        i++;
+        
     }
-    four_slot_buffer_2->done = 1;
-    sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
+    fclose(gnuplot_file);
+
+    //Producer <- FIXING IT
+    // while (i < current_sample) {
+    //     // clock_gettime(CLOCK_REALTIME,&timeout);
+    //     // timeout.tv_sec += 1;
+    //     if (sem_trywait(&four_slot_buffer_2->empty_slots) == 0){
+    //         sem_wait(&four_slot_buffer_2->mutex);
+    //         strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
+    //         printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
+    //         four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
+    //         sem_post(&four_slot_buffer_2->mutex);
+    //         sem_post(&four_slot_buffer_2->full_slots);
+            
+    //     }else{
+    //         // Semaphore not available within the timeout, continue execution
+    //         sem_wait(&four_slot_buffer_2->mutex);
+    //         if (four_slot_buffer_2->done){
+    //             sem_post(&four_slot_buffer_2->mutex);
+    //             break;
+    //         }
+    //         sem_post(&four_slot_buffer_2->mutex);
+    //         // Wait for a short duration using nano sleep before trying again
+    //         struct timespec wait_time;
+    //         wait_time.tv_sec = 0;
+    //         wait_time.tv_nsec = 20000000; // 10 milliseconds
+    //         nanosleep(&wait_time, NULL);
+    //     }
+    //     i++;
+    // }
+    // four_slot_buffer_2->done = 1;
+    // sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
 
     // sem_destroy(&four_slot_buffer_2->mutex);
     // sem_destroy(&four_slot_buffer_2->empty_slots);
@@ -431,14 +458,12 @@ int main(int argc, char *argv[]){
     int argn = atoi(argv[2]);
     char *buffer_option = argv[3];
     int shm_id = atoi(argv[4]);
-    int shm_id_2 = atoi(argv[5]);
-    // printf("%d",argn);
-    
+    int shm_id_2 = atoi(argv[5]);    
     if (strcmp(buffer_option,"sync") == 0){
         sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
     }else{
-        printf("Reconstruct %s\n",buffer_option);
-        async_reconstruct(shm_id,shm_id_2);
+        //printf("Reconstruct %s\n",buffer_option);
+        async_reconstruct(shm_id,shm_id_2,argn);
     }
     return 0;
 }

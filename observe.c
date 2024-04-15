@@ -44,7 +44,6 @@ void sync_observe(int buffer_size,int shm_id){
         int in;
         int out;
         int done;
-
     } RingBuffer;
 
     char input[256];//Initialize an array of chars to store our line of inputs from stdin or a file
@@ -54,12 +53,10 @@ void sync_observe(int buffer_size,int shm_id){
 
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
-
     if (ring_buffer == (void*)-1){
         perror("shmat");
         exit(1);
     }
-    
     while (fgets(input, sizeof(input), stdin) != NULL) {//Reading one line at a time from stdin
         
         char* equals_sign = strchr(input, '=');//Gets the value after "=" character
@@ -139,11 +136,11 @@ void async_observe(int shm_id) {
     //The full_slots semaphore is used to keep track of the number of filled slots in the shared buffer. Initially, there are no filled slots, so the semaphore is initialized with a value of 0.
     sem_init(&four_slot_buffer->full_slots,1,0);//set the full slots initial value to 0 since there are no filled slots in the buffer
 
-    char input[256];
-    char unique_names[MAX_NAMES][MAX_VALUE_LEN];
-    int num_unique_names = 0;
+    char input[256];//Store the input from each line the file
+    char unique_names[MAX_NAMES][MAX_VALUE_LEN];//Initialize an array of unique names strings
+    int num_unique_names = 0;//Count the number of unique names the file
     char end_name[MAX_VALUE_LEN] = "";
-    char prev_values[MAX_NAMES][MAX_VALUE_LEN] = {0};
+    char prev_values[MAX_NAMES][MAX_VALUE_LEN] = {0};//Keep track of all the values it has encountered in the file
 
     //struct timespec timeout;//Create a timespec timeout structure
 
@@ -226,7 +223,7 @@ int main(int argc, char *argv[]) {
         //printf("Observe Id %d\n",shm_id);
         sync_observe(buffer_size,shm_id);
     }else{
-        printf("Observe %s\n",buffer_option);
+        //printf("Observe %s\n",buffer_option);
         async_observe(shm_id);
     }
     return 0;
