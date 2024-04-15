@@ -4,7 +4,7 @@
 Kit Yan and Mario Hysa
 
 ### Testing myshell
-myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
+We've tested out both TAPPER and TAPPET programs in myshell and it seems to run gracefully. myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
 ```bash
 make myshell
 ```
@@ -30,7 +30,8 @@ To test out TAPPER with asynchronous buffering, run this command. It would be th
 You will see all the resultant samples plotted by tapplot be redirected to it's corresponding output file
 
 ### Testing TAPPET
-To test out the TAPPET program, you can run this command to compile the tappet executable and shared library
+To test out the TAPPET program, you can run this command to compile the tappet executable and it's shared library
+to access all the functions needed for tappet.c to use for multi-threading
 
 ```bash
 make TAPPET
@@ -45,7 +46,7 @@ LD_LIBRARY_PATH=./
 export LD_LIBRARY_PATH
 ```
 
-#### Testing TAPPET with synchronous buffering 
+#### Testing TAPPET with synchronous buffering (Same process as TAPPER)
 ```bash
 ./tappet -p1 ./observe -p2 ./reconstruct -p3 ./tapplot -o 2 -b sync -s 1000 < cs410-test-file > thread-sync-cs410-test-file
 ```
@@ -68,3 +69,5 @@ To remove all the files, run this command
 make clean
 ```
 ### General Info about the assignment
+
+This assignment in general was quite a challenging task. It felt grateful that Professor West was able to extend the deadline to Tuesday because I wouldn't have finished it if he hadn't. Overall, we managed to get the functionalities working on myshell as both TAPPER and TAPPET programs run on it without any problems. We felt that the most diffcult part of this assignment was understanding why TAPPER was working with our test file that we created based on the Assignment example and that was able to run successfully. However, when we went to test the class file, it wasn't exiting out of the process and it took us some time to find out that the buffer size had to increase in order for read the data in reconstruct. Another issue that we also ran into was not understanding the full logic of why the buffers would be stuck in a deadlock even though the logic made sense. We took the pseudocode logic from Anton's ring buffer web link and implement on our code to get it working. We just needed to add a few more conditions in order to fully get the data sent from one process to another for TAPPER. The other issue we ran into was that async processing in reconstruct producing the reconstructed samples to tapplot consume wasn't working as it was stuck in a deadlock. But observe to reconstruct was working fine which we didn't know why as the logic would just be the same as that. So due to time constraint and the risk of making any changes that would ruin the rest of the code, we decided to just graph the reconstructed samples from reconstruct and let tapplot plot the samples from the reconstructed.txt file. Other than that TAPPET was fairly easy to implement as we follow the logic of tapper.c parsing the command line for arguments and then using pthreads.h library to use the required functions for multithreading. To ease our life of just copying all the functions from observe, reconstruct, tapplot, we implemented a dynamic library to get the address of the symbol for each file in the dynamic library of object files. Overall, the assignment was quite challenging because we were running into issues that we didn't know how to fix so we did a bit of researching in order to know what was wrong. But it was definitely insightful and it taught us a lot of new concepts of what IPC is about.

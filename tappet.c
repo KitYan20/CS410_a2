@@ -39,7 +39,11 @@ typedef struct {
     sem_t full_slots;
     int done;
 } Four_Slot_Buffer;
-
+/*
+All these functions will be identical as it will find the require function for each thread task using 
+a shared library and will find the specified function via it's symbol.
+It will use void * functions to call each function and take the specified parameters
+*/
 void *run_observe(void *arg){
     Args *args = (Args*)arg;
     int buffer_size = args->buffer_size;
@@ -153,6 +157,7 @@ void *run_tapplot(void *arg){
 }
 
 int main(int argc, char *argv[]){
+    //Same logic of parsing the command line in tapper.c
     int is_sync = 0;
     int buffer_size = 1;
     int optional = 1;
@@ -255,18 +260,19 @@ int main(int argc, char *argv[]){
         args.shm_id = shm_id;
         args.shm_id2 = shm_id_2;
     }    
-
     pthread_t observe_thread, reconstruct_thread, tapplot_thread;
-
+    //Create threads for observe task, and reconstruct task taking the args data structure as arguments to use for 
+    //the specified functions
     pthread_create(&observe_thread,NULL,run_observe,&args);
     pthread_create(&reconstruct_thread,NULL,run_reconstruct,&args);
-    
+    //Wait for observe thread and reconstruct thread to finish its task of producing and consuming
     pthread_join(observe_thread,NULL);
     pthread_join(reconstruct_thread,NULL);
-
+    //Create a thread for tapplot 
     pthread_create(&tapplot_thread,NULL,run_tapplot,&args);
+    //Wait for tapplot thread to finish
     pthread_join(tapplot_thread,NULL);
-
+    //destroy all the semaphores once all threads has been finished for asynchronous buffering
     sem_destroy(&four_slot_buffer->mutex);
     sem_destroy(&four_slot_buffer->empty_slots);
     sem_destroy(&four_slot_buffer->full_slots);
