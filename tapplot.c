@@ -143,16 +143,16 @@ void async_plot(int argn, int shm_id_2){
     // }
 }
 
-// int main(int argc, char *argv[]) {
-//     int buffer_size = atoi(argv[1]);
-//     int argn = atoi(argv[2]);
-//     char *buffer_option = argv[3];
-//     int shm_id = atoi(argv[4]);
-//     int shm_id_2 = atoi(argv[5]);
-//     if (strcmp(buffer_option,"sync") == 0){
-//         sync_plot(buffer_size,argn,shm_id_2);
-//     }else{
-//         async_plot(argn,shm_id_2);
-//     }
-//     return 0;
-// }
+int main(int argc, char *argv[]) {
+    int buffer_size = atoi(argv[1]);
+    int argn = atoi(argv[2]);
+    char *buffer_option = argv[3];
+    int shm_id = atoi(argv[4]);
+    int shm_id_2 = atoi(argv[5]);
+    if (strcmp(buffer_option,"sync") == 0){
+        sync_plot(buffer_size,argn,shm_id_2);
+    }else{
+        async_plot(argn,shm_id_2);
+    }
+    return 0;
+}

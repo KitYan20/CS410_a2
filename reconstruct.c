@@ -345,17 +345,17 @@ void async_reconstruct(int shm_id,int shm_id_2,int argn){
 
 }
 
-// int main(int argc, char *argv[]){
-//     int buffer_size = atoi(argv[1]);
-//     int argn = atoi(argv[2]);
-//     char *buffer_option = argv[3];
-//     int shm_id = atoi(argv[4]);
-//     int shm_id_2 = atoi(argv[5]);    
-//     if (strcmp(buffer_option,"sync") == 0){
-//         sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
-//     }else{
-//         //printf("Reconstruct %s\n",buffer_option);
-//         async_reconstruct(shm_id,shm_id_2,argn);
-//     }
-//     return 0;
-// }
+int main(int argc, char *argv[]){
+    int buffer_size = atoi(argv[1]);
+    int argn = atoi(argv[2]);
+    char *buffer_option = argv[3];
+    int shm_id = atoi(argv[4]);
+    int shm_id_2 = atoi(argv[5]);    
+    if (strcmp(buffer_option,"sync") == 0){
+        sync_reconstruct(buffer_size,argn,shm_id,shm_id_2);
+    }else{
+        //printf("Reconstruct %s\n",buffer_option);
+        async_reconstruct(shm_id,shm_id_2,argn);
+    }
+    return 0;
+}

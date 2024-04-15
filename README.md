@@ -31,12 +31,12 @@ You will see all the resultant samples plotted by tapplot be redirected to it's 
 
 ### Testing TAPPET
 To test out the TAPPET program, you can run this command to compile the tappet executable and it's shared library
-to access all the functions needed for tappet.c to use for multi-threading
+to access all the functions needed for tappet.c to use for multi-threading.
 
 ```bash
 make TAPPET
 ```
-Make sure that when you are running the test, set the LD_LIBRARY_PATH to where the shared libary is located in you directory
+Make sure that when you are running the test, set the LD_LIBRARY_PATH to where the shared libary is located in you directory.And also comment out the main function in observe, reconstruct, and tapplot as it causes an error of multiple declaration of the main function when linking
 
 Here is how you can do it:
 ```bash

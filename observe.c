@@ -188,15 +188,15 @@ void async_observe(int shm_id) {
     sem_post(&four_slot_buffer->full_slots);//Release the full slots lock to allow for consumer to proceed
 }
 
-// int main(int argc, char *argv[]) {
-//     int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
-//     char *buffer_option = argv[3];//get the buffer option
-//     int shm_id = atoi(argv[4]);//get the shared memory id
-//     if (strcmp(buffer_option,"sync") == 0){
-//         sync_observe(buffer_size,shm_id);
-//     }else{
-//         //printf("Observe %s\n",buffer_option);
-//         async_observe(shm_id);
-//     }
-//     return 0;
-// }
+int main(int argc, char *argv[]) {
+    int buffer_size = atoi(argv[1]);//get buffer size for synchronous buffering
+    char *buffer_option = argv[3];//get the buffer option
+    int shm_id = atoi(argv[4]);//get the shared memory id
+    if (strcmp(buffer_option,"sync") == 0){
+        sync_observe(buffer_size,shm_id);
+    }else{
+        //printf("Observe %s\n",buffer_option);
+        async_observe(shm_id);
+    }
+    return 0;
+}
