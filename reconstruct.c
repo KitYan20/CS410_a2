@@ -10,13 +10,14 @@
 #define MAX_VALUE_SIZE 1064
 #define MAX_SAMPLES 1064
 #define MAX_NAMES 256
-
+//A Samples structure to store all of our reconstructed samples
 typedef struct {
     int sample_number;
     char value[MAX_VALUE_SIZE];
 } Sample;
+//Create a Four Slot Buffer structure
 typedef struct {
-    char data[4][MAX_VALUE_SIZE];
+    char data[4][MAX_VALUE_SIZE];//
     int in;
     int out;
     sem_t mutex;
@@ -26,14 +27,14 @@ typedef struct {
 } Four_Slot_Buffer;
 
 void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
-    Sample samples[MAX_SAMPLES];
+    Sample samples[MAX_SAMPLES];//Initialize a Samples 
     char reconstructed_samples[MAX_SAMPLES][MAX_SAMPLES];//Using array of pointers to characters (pointers to strings)
-    int num_inputs = 0;
-    char unique_names[MAX_NAMES][MAX_NAMES];
-    int num_unique_names = 0;
-    char end_name[MAX_NAMES];
+    int num_inputs = 0;//Initialize a num inputs variable to keep track the number of reconstructed samples
+    char unique_names[MAX_NAMES][MAX_NAMES]; //Initialize a unique names array
+    int num_unique_names = 0;//Keep track of the number of unique names
+    char end_name[MAX_NAMES];//Get the end name of the last unique name
     int current_sample = 0;
-    typedef struct {
+    typedef struct {//Initialize our RingBuffer data structure
         char data[buffer_size][MAX_VALUE_SIZE];
         int in;
         int out;
@@ -41,7 +42,6 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     } RingBuffer;
     /* Attach shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
-
     if (ring_buffer == (void*)-1){
         perror("shmat");
         exit(1);
@@ -122,18 +122,17 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
         }
 
     }
-    strcat(samples[current_sample-1].value," s");
+    strcat(samples[current_sample-1].value," s");//Used for cs410-test-file
     // for (int i = 0; i < current_sample ; i++){
     //     printf("Constructed Samples %s\n",samples[i].value);
     // }
+    
+    //Initialize the second Ring Buffer to produce and consume to Tapplot
     RingBuffer *ring_buffer_2 = (RingBuffer*) shmat(shm_id_2,NULL,0);
     ring_buffer_2->in = 0;
     ring_buffer_2->out = 0;
     ring_buffer_2->done = 0;
 
-    for (int i = 0; i < buffer_size ; i++){
-        memset(ring_buffer->data[i], 0, MAX_VALUE_SIZE);
-    }
     if (ring_buffer_2 == (void*)-1){
         perror("shmat");
         exit(1);
@@ -142,39 +141,14 @@ void sync_reconstruct(int buffer_size,int argn,int shm_id,int shm_id_2){
     //Producer 
     while(i < current_sample){
           while((ring_buffer_2->in + 1) % buffer_size == ring_buffer_2->out);// Wait if the buffer is full
-          strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);
+          strcpy(ring_buffer_2->data[ring_buffer_2->in],samples[i].value);//Write the reconstructed samples in a slot specified by "in"
           //printf("Producer 2 produces %s\n",ring_buffer_2->data[ring_buffer_2->in]);
           i++;
-          ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
+          ring_buffer_2->in = (ring_buffer_2->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo to write
           //sleep(1);
          
     }
     ring_buffer_2->done = 1;//Ring buffer is done processing
-
-    // FILE *gnuplot_file = fopen("data.txt", "w");
-    // if (gnuplot_file == NULL) {
-    //     perror("Error opening file");
-    //     exit(1);
-    // }
-    // for (int i = 0; i < current_sample; i++) {
-    //     printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
-    //     char *token = strtok(samples[i].value, ",");
-    //     int field_count = 1;
-    //     while (token != NULL) {
-    //         if (field_count == argn) {
-    //             char *value = strchr(token, '=');
-    //             if (value != NULL) {
-    //                 value++;
-    //                 fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-    //             }
-    //             break;
-    //         }
-    //         token = strtok(NULL, ",");
-    //         field_count++;
-    //     }
-        
-    // }
-    // fclose(gnuplot_file);
 
     //Detach shared memory segment from observe to reconstruct
     if (shmdt(ring_buffer) == -1) {
@@ -327,87 +301,42 @@ void async_reconstruct(int shm_id,int shm_id_2,int argn){
     //     printf("Consumer produced %s\n",samples[i].value);
     // }
     
-    //TO BE FIXED !!!! 
-    Four_Slot_Buffer *four_slot_buffer_2 = (Four_Slot_Buffer*) shmat(shm_id_2,NULL,0);
+    // Four_Slot_Buffer *four_slot_buffer_2 = (Four_Slot_Buffer*) shmat(shm_id_2,NULL,0);
 
-    if (four_slot_buffer_2 == (void*)-1){
-        perror("shmat");
-        exit(1);
-    }
-    //intialize second four slot buffer
-    four_slot_buffer_2->in = 0;
-    four_slot_buffer_2->out = 0;
-    four_slot_buffer_2->done = 0;
-    //Initialize the sempahores with sem_init
-    sem_init(&four_slot_buffer_2->mutex,1,1);
-    sem_init(&four_slot_buffer_2->empty_slots,1,4);
-    sem_init(&four_slot_buffer_2->full_slots,1,0);
+    // if (four_slot_buffer_2 == (void*)-1){
+    //     perror("shmat");
+    //     exit(1);
+    // }
+
+    //Because we had trouble figuring out how to implement a second Four Slot Buffer, we just wrote all the samples 
+    //out to a file to be plotted
     int i = 0;
-    //clock_gettime(CLOCK_REALTIME,&timeout);
-    //timeout.tv_sec += 1;
-
-    FILE *gnuplot_file = fopen("data.txt", "w");
+    FILE *gnuplot_file = fopen("reconstructed.txt", "w");
     if (gnuplot_file == NULL) {
         perror("Error opening file");
         exit(1);
     }
     for (int i = 0; i < current_sample; i++) {
         //printf("sample number %d, %s\n", samples[i].sample_number, samples[i].value);
-        char *token = strtok(samples[i].value, ",");
-        int field_count = 1;
+        char *token = strtok(samples[i].value, ",");//Separate each value in the reconstructed samples via ','
+        int field_count = 1;//Initialize a field count by 1 to indiciate which specific value to plot
         while (token != NULL) {
             if (field_count == argn) {
-                char *value = strchr(token, '=');
+                char *value = strchr(token, '=');//Get the value for each name-value pair
                 if (value != NULL) {
-                    value++;
-                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);
-                    fprintf(stdout,"Sample Number:%d - Value:%s\n", samples[i].sample_number, value);
+                    value++;//Get the value for each name-value pair by incrementing the pointer to the next value string
+                    fprintf(gnuplot_file, "%d %s\n", samples[i].sample_number, value);//write the sample number and value into the gnuplot_file stream
+                    fprintf(stdout,"Sample Number:%d - Value:%s\n", samples[i].sample_number, value);//write the sample number and sample value plotted by tapplot back to stdout stream
                 }
-                break;
+                break;//move on to the next sample to process
             }
-            token = strtok(NULL, ",");
-            field_count++;
+            token = strtok(NULL, ",");//Move on to the next value in a sample to plot if the field count doesn't match argn
+            field_count++;//Increment the field count by one to check again
         }
         
     }
-    fclose(gnuplot_file);
+    fclose(gnuplot_file);//close the gnuplot_file stream
 
-    //Producer <- FIXING IT
-    // while (i < current_sample) {
-    //     // clock_gettime(CLOCK_REALTIME,&timeout);
-    //     // timeout.tv_sec += 1;
-    //     if (sem_trywait(&four_slot_buffer_2->empty_slots) == 0){
-    //         sem_wait(&four_slot_buffer_2->mutex);
-    //         strcpy(four_slot_buffer_2->data[four_slot_buffer_2->in],samples[i].value);
-    //         printf("Producer 2 produces %s\n",four_slot_buffer_2->data[four_slot_buffer_2->in]);
-    //         four_slot_buffer_2->in = (four_slot_buffer_2->in + 1) % 4;
-    //         sem_post(&four_slot_buffer_2->mutex);
-    //         sem_post(&four_slot_buffer_2->full_slots);
-            
-    //     }else{
-    //         // Semaphore not available within the timeout, continue execution
-    //         sem_wait(&four_slot_buffer_2->mutex);
-    //         if (four_slot_buffer_2->done){
-    //             sem_post(&four_slot_buffer_2->mutex);
-    //             break;
-    //         }
-    //         sem_post(&four_slot_buffer_2->mutex);
-    //         // Wait for a short duration using nano sleep before trying again
-    //         struct timespec wait_time;
-    //         wait_time.tv_sec = 0;
-    //         wait_time.tv_nsec = 20000000; // 10 milliseconds
-    //         nanosleep(&wait_time, NULL);
-    //     }
-    //     i++;
-    // }
-    // four_slot_buffer_2->done = 1;
-    // sem_post(&four_slot_buffer_2->full_slots); // Unblock the consumer
-
-    // sem_destroy(&four_slot_buffer_2->mutex);
-    // sem_destroy(&four_slot_buffer_2->empty_slots);
-    // sem_destroy(&four_slot_buffer_2->full_slots);
-
-    //printf("Done\n");
     //Detach shared memory segment between observe and reconstruct
     if (shmdt(four_slot_buffer) == -1) {
         perror("shmdt");

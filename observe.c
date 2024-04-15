@@ -33,16 +33,16 @@ void sync_observe(int buffer_size,int shm_id){
     char input[256];//Initialize an array of chars to store our line of inputs from stdin or a file
     char unique_names[MAX_NAMES][MAX_VALUE_SIZE];//Initialize an array of unique names strings
     int num_unique_names = 0;//Count the number of unique names the file
-    char end_name[MAX_VALUE_SIZE] = "";
     char prev_values[MAX_NAMES][MAX_VALUE_SIZE] = {0};//Keep track of all the values it has encountered in the file
-    int num_inputs = 0;
-    char samples[MAX_VALUE_SIZE][MAX_VALUE_SIZE];
-    /* Attach shared memory segment to shared_data */
+    int num_inputs = 0;//Keep track for the number of inputs it will produce to reconstruct
+    char samples[MAX_VALUE_SIZE][MAX_VALUE_SIZE];//Initiate our samples array to fill the samples to send to construct
+    /* Attach the ring buffer shared memory segment to shared_data */
     RingBuffer *ring_buffer = (RingBuffer*) shmat(shm_id,NULL,0);
     if (ring_buffer == (void*)-1){
         perror("shmat");
         exit(1);
     }
+    //initialize our values in the Ring Buffer structure
     ring_buffer->in = 0;
     ring_buffer->out = 0;
     ring_buffer->done = 0;
@@ -72,7 +72,7 @@ void sync_observe(int buffer_size,int shm_id){
             //If name does not exist
             if (strcmp(prev_values[existing_name_index], value) != 0){
                 strcpy(prev_values[existing_name_index], value);
-                sprintf(samples[num_inputs],"%s=%s", name, value);
+                sprintf(samples[num_inputs],"%s=%s", name, value);//Fill a sample into the samples array
                 num_inputs++;
             }   
         }
@@ -80,15 +80,15 @@ void sync_observe(int buffer_size,int shm_id){
     // for (int i ; i < num_inputs ; i++){ //<--- Use this to test out tappet output of observe
     //     printf("%s\n",samples[i]);
     // }
-    int i = 0;
+    int i = 0; 
+    //This will be the producer to produce the samples to reconstruct
     while (i < num_inputs){
         // printf("%s\n",samples[i]);
-        while((ring_buffer->in + 1) % buffer_size == ring_buffer->out);
-        // // Buffer is full, wait for space to become available
-        strcpy(ring_buffer->data[ring_buffer->in],samples[i]);
+        while((ring_buffer->in + 1) % buffer_size == ring_buffer->out);// Buffer is full, wait for space to become available
+        strcpy(ring_buffer->data[ring_buffer->in],samples[i]);//Place the samples into the Ring Buffer in a slot specified by 'in'
         //printf("Producer produced [%d] %s\n",i, ring_buffer->data[ring_buffer->in]);
-        ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo
-        i++;
+        ring_buffer->in = (ring_buffer->in + 1) % buffer_size;//Move on to the next slot in the buffer using modulo to produce the sample
+        i++;//Increment to get the next sample
     }
     // Continue processing until all input is consumed
     while (ring_buffer->in != ring_buffer->out) {
@@ -126,10 +126,7 @@ void async_observe(int shm_id) {
     char input[256];//Store the input from each line the file
     char unique_names[MAX_NAMES][MAX_VALUE_SIZE];//Initialize an array of unique names strings
     int num_unique_names = 0;//Count the number of unique names the file
-    char end_name[MAX_VALUE_SIZE] = "";
     char prev_values[MAX_NAMES][MAX_VALUE_SIZE] = {0};//Keep track of all the values it has encountered in the file
-
-    //struct timespec timeout;//Create a timespec timeout structure
 
     while (fgets(input, sizeof(input), stdin) != NULL) {//Read each line in a file
         char* equals_sign = strchr(input, '=');
@@ -154,9 +151,6 @@ void async_observe(int shm_id) {
             if (existing_name_index == -1) {//Its a new name
                 strcpy(unique_names[num_unique_names], name);//Copy the name into the unique names array
                 num_unique_names++;//Increment the number of unique names
-                // if (num_unique_names > 1) {
-                //     strcpy(end_name, name);//get the last unique to construct a sample
-                // }
             }
             if (strcmp(prev_values[existing_name_index], value) != 0) {
                 //Main code to produce the required samples

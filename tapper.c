@@ -16,22 +16,23 @@
 typedef struct {
     char *name;
 } Programs;
+//Create a Four Slot Asynchronous Buffer data structure
 typedef struct {
-    char data[4][MAX_VALUE_SIZE];
-    int in;
-    int out;
-    sem_t mutex;
-    sem_t empty_slots;
-    sem_t full_slots;
-    int done;
+    char data[4][MAX_VALUE_SIZE];//Initiate our 4 slot array bufferto fill the samples
+    int in;//Initiate a pointer for writing a sample in the buffer specified by 'in'
+    int out;//Initiate a pointer for reading a sample in the buffer specified by 'out'
+    sem_t mutex;//Create a mutex semaphore for locking
+    sem_t empty_slots;//Create a empty slots semaphore to be use for binary semaphore
+    sem_t full_slots;//Create a full slots semaphore to be use for binary semaphore
+    int done;//Initiate a done binary condition
 } Four_Slot_Buffer;
 
 void synchronous_shared_memory(int num_programs, Programs programs[], int buffer_size, int optional) {
     typedef struct {
-        char data[buffer_size][MAX_VALUE_SIZE];
-        int in;
-        int out;
-        int done;
+        char data[buffer_size][MAX_VALUE_SIZE];//Create our ring buffer specified by user size to fill the samples
+        int in;//Initiate a pointer for writing a sample in the buffer specified by 'in'
+        int out;//Initiate a pointer for reading a sample in the buffer specified by 'out'
+        int done;//Initiate a done binary condition
     }RingBuffer;
 
     //Create a shared memory id for observe and reconstruct
@@ -49,6 +50,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
         perror("shmget meme");
         exit(1);
     }
+    //These variables will be used as arguments for our child processes
     char optional_argument[256];
     char buff_size[256];
     snprintf(optional_argument,sizeof(optional_argument),"%d",optional);
@@ -66,6 +68,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     //fork and execute observe process
     pid_t observe_pid = fork();
     if (observe_pid == 0) {
+        //use execl to execute the executable observe process with a list of specified arguments
         execl(programs[0].name, "observe", buff_size, optional_argument, "sync", shm_id_obs_rec, NULL);
         perror("execl");
         exit(1);
@@ -76,6 +79,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     
     pid_t reconstruct_pid = fork();
     if (reconstruct_pid == 0) {
+        //use execl to execute the executable reconstruct process with a list of specified arguments
         execl(programs[1].name, "reconstruct", buff_size, optional_argument, "sync", shm_id_obs_rec, shm_id_rec_tap, NULL);
         perror("execl");
         exit(1);
@@ -88,6 +92,7 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     
     pid_t tapplot_pid = fork();
     if (tapplot_pid == 0) {
+        //use execl to execute the executable tapplot process with a list of specified arguments
         execl(programs[2].name, "tapplot", buff_size, optional_argument, "sync", shm_id_obs_rec, shm_id_rec_tap, NULL);
         perror("execl");
         exit(1);
@@ -108,7 +113,8 @@ void synchronous_shared_memory(int num_programs, Programs programs[], int buffer
     }
 }
 
-void asynchronous_shared_memory(int num_programs, Programs programs[], int buffer_size, int optional){    
+void asynchronous_shared_memory(int num_programs, Programs programs[], int buffer_size, int optional){  
+    //Same process as synchronous_shared_memory  
     int shm_id = shmget(IPC_PRIVATE,sizeof(Four_Slot_Buffer), IPC_CREAT | 0666);//Shared Memory ID
     // Create shared memory segment
     if (shm_id < 0) {

@@ -13,7 +13,7 @@ LD = -L.
 all: myshell TAPPER TAPPET
 TAPPER: tapper observe reconstruct tapplot
 TAPPET: tappet sharedlibrary.so
-myshell: $(OBJS)
+myshell: myshell.o
 	$(CC) ${OPT} ${DEBUG} $^ -o $@
 tappet: tappet.o $(SLIBS)
 	$(CC) $(LD) ${OPT} ${DEBUG} $^ $(LDLIBS) -lrt -lpthread -o $@  
