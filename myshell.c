@@ -260,13 +260,13 @@ void parse_cmd(char *cmd, char *args[], int *background, int *pipe_count) {
         *pipe_count = cmd_pipe_count;
 
         
-        if (*pipe_count > 0) {// Need execute pipeline process if there are "|" in the command line
+        if (*pipe_count > 0) {// Need to execute pipeline process if there are "|" in the command line
             execute_pipeline(args, *pipe_count, *background);
         } else {// Execute the command with the array of arguments and background status
             execute_command(args, *background);
         }
 
-        // Reset the args array and counters for the next sequence og command
+        // Reset the args array and counters for the next sequence of command
         arg_count = 0;
         *background = 0;
         *pipe_count = 0;
