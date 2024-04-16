@@ -4,7 +4,7 @@
 Kit Yan and Mario Hysa
 
 ### Testing myshell
-We've tested out both TAPPER and TAPPET programs in myshell and it seems to run gracefully. myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
+We've tested out both TAPPER and TAPPET programs in myshell and it seems to run gracefully without redirection to a output file for some reason when I'm testing it with synchronous buffering for both TAPPER and TAPPET. So for now, you can testing out the test command line if you are testing async on myshell and test sync on a normal shell. myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
 ```bash
 make myshell
 ```
@@ -18,7 +18,7 @@ To test out the TAPPER program, you can run this command to compile all the requ
 make TAPPER
 ```
 #### Testing TAPPER with synchronous buffering 
-To test out TAPPER with synchronous buffering, run this command. Feel free to modify the optional argument value with the flag labeled "-o" or feel free to modify the buffer size. One thing we ran into when testing the class test file was that our buffer was too small to handle all the samples from the test file so it was stuck in a loop processing around 50 samples. So we figured that increasing the buffer size to 1000 would be the most ideal size for the buffer to process all the samples and it worked.
+To test out TAPPER with synchronous buffering, run this command. Feel free to modify the optional argument value with the flag labeled "-o" or feel free to modify the buffer size. One thing we ran into when testing the class test file was that our buffer was too small to handle all the samples from the test file so it was stuck in a loop processing around 50 samples. So we figured that increasing the buffer size to 1000 would be the most ideal size for the buffer to process all the samples and it worked. If you want to test synchronous with redirection to a output file, make sure to run it on a normal shell because for some reason, it crashes. But it won't crash if you are not do any stdout redirection to a file. Same goes for TAPPET.
 ```bash
 ./tapper -p1 ./observe -p2 ./reconstruct -p3 ./tapplot -o 2 -b sync -s 1000 < cs410-test-file > ipc-sync-cs410-test-file
 ```
@@ -36,7 +36,7 @@ to access all the functions needed for tappet.c to use for multi-threading.
 ```bash
 make TAPPET
 ```
-Make sure that when you are running the test, set the LD_LIBRARY_PATH to where the shared libary is located in you directory.And also comment out the main function in observe, reconstruct, and tapplot as it causes an error of multiple declaration of the main function when linking
+Make sure that when you are running the test, set the LD_LIBRARY_PATH to where the shared libary is located in you directory. And also comment out the main function in observe, reconstruct, and tapplot as it causes an error of multiple declaration of the main function when linking.
 
 Here is how you can do it:
 ```bash
