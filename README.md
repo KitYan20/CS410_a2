@@ -4,7 +4,7 @@
 Kit Yan and Mario Hysa
 
 ### Testing myshell
-We've tested out both TAPPER and TAPPET programs in myshell and it seems to run gracefully without redirection to a output file for some reason when I'm testing it with synchronous buffering for both TAPPER and TAPPET. So for now, you can testing out the test command line if you are testing async on myshell and test sync on a normal shell. myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
+We've tested out both TAPPER and TAPPET programs in myshell and it seems to run gracefully without redirection to a output file for some reason when I'm testing it with synchronous buffering for both TAPPER and TAPPET. So for now, you can testing out the test command line if you are testing async on myshell and test sync on a normal shell if you are redirecting the resultant samples to file. If not, you can run sync on myshell. myshell behaves exactly like a normal Linux shell. To start the shell, compile the program in the terminal 
 ```bash
 make myshell
 ```
