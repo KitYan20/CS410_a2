@@ -1,4 +1,4 @@
-# Assignment 2
+# CS410_a2
 
 ### Group Members
 Kit Yan and Mario Hysa
